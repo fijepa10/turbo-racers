@@ -1743,7 +1743,7 @@ function gameLoop(time) {
         if (angleDelta > Math.PI) angleDelta = Math.PI * 2 - angleDelta;
         r._prevAngle = r.angle;
         // Skid when turning sharply at speed
-        if (angleDelta > 0.06 && r.speed > 3) {
+        if (angleDelta > 0.18 && r.speed > 3) {
           r._skidTimer = 30; // half-second minimum
         }
         if (r._skidTimer > 0) {
