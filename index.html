@@ -620,19 +620,20 @@ function getSpeedMultiplier(r) {
 let crate = null;
 let crateDebris = [];
 let crateRespawnTimer = 0;
+let crateRng = null; // seeded RNG for deterministic crate placement in multiplayer
 const BOOST_DURATION = 480; // 8 seconds at 60fps
 const BOOST_SPEED_MULT = 1.25;
 
 function spawnCrate() {
   if (!track || crate) return;
   const cl = track.centerline.length;
-  // Pick a random spot away from all cars
-  const allCars = [player, ...racers].filter(Boolean);
+  const rnd = crateRng || Math.random;
+  // Pick a random spot on the track (deterministic in multiplayer)
   for (let attempts = 0; attempts < 20; attempts++) {
-    const idx = Math.floor(Math.random() * cl);
+    const idx = Math.floor(rnd() * cl);
     const p = track.centerline[idx];
     const n = track.normals[idx];
-    const offset = (Math.random() - 0.5) * 20;
+    const offset = (rnd() - 0.5) * 20;
     const cx = p.x + n.x * offset;
     const cy = p.y + n.y * offset;
     // Check no car is nearby
@@ -1959,12 +1960,12 @@ function showFinish() {
 }
 
 function initTrackAndRacers(rng, customTrackPoints) {
+  const rand = rng || Math.random;
   // Use custom track if provided, otherwise generate randomly
   if (customTrackPoints && customTrackPoints.length >= 10) {
     track = generateTrackFromPoints(customTrackPoints);
   } else {
     const preset = TRACK_PRESETS[selectedTrackLength] || TRACK_PRESETS.medium;
-    const rand = rng || Math.random;
     const trackRadius = preset.baseRadiusMin + rand() * (preset.baseRadiusMax - preset.baseRadiusMin);
     track = generateTrack(trackRadius, preset.numPoints, rng);
   }
@@ -2024,7 +2025,7 @@ function initTrackAndRacers(rng, customTrackPoints) {
 
   camera.x = player.x;
   camera.y = player.y;
-  crate = null; crateDebris = []; crateRespawnTimer = 120;
+  crate = null; crateDebris = []; crateRespawnTimer = 120; crateRng = null;
 }
 
 function startRace(isAutoRestart) {
@@ -2393,9 +2394,10 @@ function mpStartMultiplayerRace(msg) {
   document.getElementById('ui').style.display = 'block';
   document.getElementById('lap-info').style.display = 'block';
 
-  // Generate track from seed
+  // Generate track from seed - use same seed for crate placement
   selectedTrackLength = msg.trackLength || selectedTrackLength;
   var rng = createRNG(msg.seed);
+  crateRng = createRNG(msg.seed + 12345); // offset seed for crates
   var preset = TRACK_PRESETS[selectedTrackLength] || TRACK_PRESETS.medium;
   var trackRadius = preset.baseRadiusMin + rng() * (preset.baseRadiusMax - preset.baseRadiusMin);
   track = generateTrack(trackRadius, preset.numPoints, rng);
@@ -2500,7 +2502,8 @@ function mpSendInput() {
     angle: player.angle,
     speed: player.speed,
     lap: player.lap,
-    progress: player.progress
+    progress: player.progress,
+    boostTimer: player.boostTimer || 0
   }));
 }
 
@@ -2522,8 +2525,9 @@ function mpHandleStateUpdate(remotePlayers) {
           target.targetAngle = rp.angle;
           target.targetSpeed = rp.speed;
         }
-        // Update lap/progress directly
+        // Update lap/progress/boost directly
         if (rp.lap !== undefined) racers[ri].lap = rp.lap;
+        if (rp.boostTimer !== undefined) racers[ri].boostTimer = rp.boostTimer;
         break;
       }
     }
@@ -3211,7 +3215,7 @@ mpStartMultiplayerRace = function(msg) {
     camera.y = player.y;
   }
 
-  crate = null; crateDebris = []; crateRespawnTimer = 120;
+  crate = null; crateDebris = []; crateRespawnTimer = 120; crateRng = null;
   raceState = 'countdown';
   var cdOverlay = document.getElementById('mp-countdown-overlay');
   cdOverlay.style.display = 'block';

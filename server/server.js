@@ -142,6 +142,7 @@ wss.on('connection', (ws) => {
           if (msg.speed !== undefined) p.speed = msg.speed;
           if (msg.lap !== undefined) p.lap = msg.lap;
           if (msg.progress !== undefined) p.progress = msg.progress;
+          if (msg.boostTimer !== undefined) p.boostTimer = msg.boostTimer;
         }
         break;
       }
@@ -288,7 +289,7 @@ function startGameLoop(room) {
           id: p.id,
           input: p.input,
           x: p.x, y: p.y, angle: p.angle, speed: p.speed,
-          lap: p.lap, progress: p.progress
+          lap: p.lap, progress: p.progress, boostTimer: p.boostTimer || 0
         });
       }
     }
