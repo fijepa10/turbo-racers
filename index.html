@@ -531,8 +531,8 @@ function spawnCrate() {
 function smashCrate(x, y, carAngle) {
   // Rigid plank pieces that fly out with physics
   const planks = [
-    { w: 8, h: 3 }, { w: 7, h: 2.5 }, { w: 9, h: 2 }, { w: 6, h: 3 },
-    { w: 5, h: 2 }, { w: 7, h: 2 }, { w: 4, h: 3 }, { w: 8, h: 2.5 }
+    { w: 14, h: 5 }, { w: 12, h: 4 }, { w: 15, h: 3.5 }, { w: 10, h: 5 },
+    { w: 11, h: 4 }, { w: 13, h: 3 }, { w: 9, h: 5 }, { w: 14, h: 4 }
   ];
   for (const plank of planks) {
     const spreadAngle = carAngle + (Math.random() - 0.5) * 2.5;
@@ -581,12 +581,27 @@ function updateCrate(allCars) {
     d.x += d.vx;
     d.y += d.vy;
     const speed = Math.sqrt(d.vx * d.vx + d.vy * d.vy);
-    // Friction increases as they slow down (simulates settling)
     const fric = speed > 0.5 ? d.friction : 0.9;
     d.vx *= fric;
     d.vy *= fric;
     d.angle += d.spin;
-    d.spin *= (speed > 0.3 ? 0.98 : 0.92); // spin slows as piece settles
+    d.spin *= (speed > 0.3 ? 0.98 : 0.92);
+    // Keep debris on track
+    if (track) {
+      const ci = closestCenterlineIndex(d.x, d.y);
+      const cp = track.centerline[ci];
+      const cn = track.normals[ci];
+      const toDeb = { x: d.x - cp.x, y: d.y - cp.y };
+      const dotN = toDeb.x * cn.x + toDeb.y * cn.y;
+      const hw = TRACK_WIDTH / 2 - 2;
+      if (Math.abs(dotN) > hw) {
+        const sign = dotN > 0 ? 1 : -1;
+        d.x = cp.x + cn.x * hw * sign;
+        d.y = cp.y + cn.y * hw * sign;
+        d.vx *= -0.3;
+        d.vy *= -0.3;
+      }
+    }
     d.life--;
     if (d.life <= 0) crateDebris.splice(i, 1);
   }
@@ -1728,7 +1743,7 @@ function gameLoop(time) {
         if (angleDelta > Math.PI) angleDelta = Math.PI * 2 - angleDelta;
         r._prevAngle = r.angle;
         // Skid when turning sharply at speed
-        if (angleDelta > 0.025 && r.speed > 3) {
+        if (angleDelta > 0.06 && r.speed > 3) {
           r._skidTimer = 30; // half-second minimum
         }
         if (r._skidTimer > 0) {
