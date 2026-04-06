@@ -1524,8 +1524,8 @@ function gameLoop(time) {
         if (r.skidTimer === undefined) { r.skidTimer = 0; r.prevSteer = 0; }
         const steerDelta = Math.abs(r.steerAngle - r.prevSteer);
         r.prevSteer = r.steerAngle;
-        if (steerDelta > 0.008 && r.speed > 2) {
-          r.skidTimer = 60;
+        if (steerDelta > 0.02 && r.speed > 3) {
+          r.skidTimer = Math.min(r.skidTimer + 15, 180);
         }
         if (r.skidTimer > 0) {
           addTireMark(r.x, r.y, r.angle, CAR_WIDTH * 0.8);
