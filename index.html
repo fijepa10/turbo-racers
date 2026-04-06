@@ -1185,29 +1185,32 @@ function createRacer(id, startIdx, colorIdx, rng) {
 
 function updateRacer(r, dt, allRacers) {
   if (r.finished) {
-    // Slow to a stop and line up in finish order with spacing
-    r.speed *= 0.96;
-    if (r.speed > 0.3) {
+    r.speed *= 0.92;
+    if (r.speed < 0.5) r.speed = 0;
+    // Glide to a parked position on the track
+    const finishPos = finishOrder.indexOf(r);
+    const slot = (finishPos >= 0 ? finishPos : 0);
+    // Target: park along the track past the finish line, spaced out
+    if (!r._parkTarget) {
       const ci = closestCenterlineIndexNear(r.x, r.y, r.progress);
-      // Each finished car targets a point further ahead based on finish position
-      const finishPos = finishOrder.indexOf(r);
-      const spacing = (finishPos >= 0 ? finishPos : 0) * 12;
-      const ahead = (ci + 20 + spacing) % track.centerline.length;
-      const target = track.centerline[ahead];
-      const norm = track.normals[ahead];
-      // Lateral offset so they don't stack on center
-      const lateralOffset = (finishPos % 2 === 0 ? 1 : -1) * 10;
-      const tx = target.x + norm.x * lateralOffset;
-      const ty = target.y + norm.y * lateralOffset;
-      const toT = Math.atan2(ty - r.y, tx - r.x);
-      let diff = toT - r.angle;
-      while (diff > Math.PI) diff -= Math.PI * 2;
-      while (diff < -Math.PI) diff += Math.PI * 2;
-      r.angle += diff * 0.1;
-      r.progress = ci;
+      const parkIdx = (ci + 30 + slot * 15) % track.centerline.length;
+      const pp = track.centerline[parkIdx];
+      const pn = track.normals[parkIdx];
+      const nextPt = track.centerline[(parkIdx + 3) % track.centerline.length];
+      const lateralOffset = (slot % 2 === 0 ? 1 : -1) * 12;
+      r._parkTarget = {
+        x: pp.x + pn.x * lateralOffset,
+        y: pp.y + pn.y * lateralOffset,
+        angle: Math.atan2(nextPt.y - pp.y, nextPt.x - pp.x)
+      };
     }
-    r.x += Math.cos(r.angle) * r.speed;
-    r.y += Math.sin(r.angle) * r.speed;
+    // Lerp toward park position
+    r.x += (r._parkTarget.x - r.x) * 0.05;
+    r.y += (r._parkTarget.y - r.y) * 0.05;
+    let aDiff = r._parkTarget.angle - r.angle;
+    while (aDiff > Math.PI) aDiff -= Math.PI * 2;
+    while (aDiff < -Math.PI) aDiff += Math.PI * 2;
+    r.angle += aDiff * 0.05;
     return;
   }
 
@@ -1523,29 +1526,32 @@ function drawCar(r) {
 
 function updatePlayer(r, dt) {
   if (r.finished) {
-    // Slow to a stop and line up in finish order with spacing
-    r.speed *= 0.96;
-    if (r.speed > 0.3) {
+    r.speed *= 0.92;
+    if (r.speed < 0.5) r.speed = 0;
+    // Glide to a parked position on the track
+    const finishPos = finishOrder.indexOf(r);
+    const slot = (finishPos >= 0 ? finishPos : 0);
+    // Target: park along the track past the finish line, spaced out
+    if (!r._parkTarget) {
       const ci = closestCenterlineIndexNear(r.x, r.y, r.progress);
-      // Each finished car targets a point further ahead based on finish position
-      const finishPos = finishOrder.indexOf(r);
-      const spacing = (finishPos >= 0 ? finishPos : 0) * 12;
-      const ahead = (ci + 20 + spacing) % track.centerline.length;
-      const target = track.centerline[ahead];
-      const norm = track.normals[ahead];
-      // Lateral offset so they don't stack on center
-      const lateralOffset = (finishPos % 2 === 0 ? 1 : -1) * 10;
-      const tx = target.x + norm.x * lateralOffset;
-      const ty = target.y + norm.y * lateralOffset;
-      const toT = Math.atan2(ty - r.y, tx - r.x);
-      let diff = toT - r.angle;
-      while (diff > Math.PI) diff -= Math.PI * 2;
-      while (diff < -Math.PI) diff += Math.PI * 2;
-      r.angle += diff * 0.1;
-      r.progress = ci;
+      const parkIdx = (ci + 30 + slot * 15) % track.centerline.length;
+      const pp = track.centerline[parkIdx];
+      const pn = track.normals[parkIdx];
+      const nextPt = track.centerline[(parkIdx + 3) % track.centerline.length];
+      const lateralOffset = (slot % 2 === 0 ? 1 : -1) * 12;
+      r._parkTarget = {
+        x: pp.x + pn.x * lateralOffset,
+        y: pp.y + pn.y * lateralOffset,
+        angle: Math.atan2(nextPt.y - pp.y, nextPt.x - pp.x)
+      };
     }
-    r.x += Math.cos(r.angle) * r.speed;
-    r.y += Math.sin(r.angle) * r.speed;
+    // Lerp toward park position
+    r.x += (r._parkTarget.x - r.x) * 0.05;
+    r.y += (r._parkTarget.y - r.y) * 0.05;
+    let aDiff = r._parkTarget.angle - r.angle;
+    while (aDiff > Math.PI) aDiff -= Math.PI * 2;
+    while (aDiff < -Math.PI) aDiff += Math.PI * 2;
+    r.angle += aDiff * 0.05;
     return;
   }
 
@@ -2174,6 +2180,7 @@ function startRace(isAutoRestart) {
         cdEl.style.display = 'none';
         raceState = 'racing';
         initAudio();
+        startEngineLoop();
         clearInterval(interval);
       }
     }, AUTOPILOT ? 200 : 800);
