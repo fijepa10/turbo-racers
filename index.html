@@ -1720,13 +1720,20 @@ function gameLoop(time) {
           }
         }
       }
-      // Skid marks - while actively turning and going fast
+      // Skid marks - based on actual turning rate (works for player and bots)
       for (const r of allCarsVfx) {
-        const isTurning = (r.id === 0)
-          ? (keys['ArrowLeft'] || keys['a'] || keys['A'] || keys['ArrowRight'] || keys['d'] || keys['D'])
-          : (Math.abs(r.steerAngle) > 0.08);
-        if (isTurning && r.speed > 3) {
+        if (r._prevAngle === undefined) r._prevAngle = r.angle;
+        if (r._skidTimer === undefined) r._skidTimer = 0;
+        let angleDelta = Math.abs(r.angle - r._prevAngle);
+        if (angleDelta > Math.PI) angleDelta = Math.PI * 2 - angleDelta;
+        r._prevAngle = r.angle;
+        // Skid when turning sharply at speed
+        if (angleDelta > 0.025 && r.speed > 3) {
+          r._skidTimer = 30; // half-second minimum
+        }
+        if (r._skidTimer > 0) {
           addTireMark(r.x, r.y, r.angle, CAR_WIDTH * 0.8);
+          r._skidTimer--;
         }
       }
       // Update cones
