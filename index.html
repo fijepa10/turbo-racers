@@ -503,22 +503,19 @@ function spawnCones() {
   cones = [];
   if (!track) return;
   const cl = track.centerline.length;
-  // Place 4-8 clusters of cones along the track
   const numClusters = 4 + Math.floor(Math.random() * 5);
   for (let c = 0; c < numClusters; c++) {
     const startIdx = Math.floor(Math.random() * cl);
-    const count = 3 + Math.floor(Math.random() * 6); // 3-8 cones per cluster
+    const count = 3 + Math.floor(Math.random() * 6);
     for (let i = 0; i < count; i++) {
       const idx = (startIdx + i * 4) % cl;
       const p = track.centerline[idx];
       const n = track.normals[idx];
-      // Slight random offset from centerline
-      const offset = (Math.random() - 0.5) * 20;
+      const offset = (Math.random() - 0.5) * 15;
       cones.push({
         x: p.x + n.x * offset,
         y: p.y + n.y * offset,
         vx: 0, vy: 0,
-        angle: Math.random() * Math.PI * 2,
         spin: 0,
         hit: false,
         alpha: 1
@@ -529,32 +526,42 @@ function spawnCones() {
 
 function updateCones(allCars) {
   for (const cone of cones) {
-    // Check collision with all cars
     for (const car of allCars) {
       const dx = cone.x - car.x;
       const dy = cone.y - car.y;
       const dist = Math.sqrt(dx * dx + dy * dy);
-      if (dist < 14 && dist > 0.1) {
-        // Smash! Push cone in car's direction
-        const pushSpeed = car.speed * 0.8;
+      if (dist < 12 && dist > 0.1) {
+        const pushSpeed = car.speed * 0.7;
         cone.vx = Math.cos(car.angle) * pushSpeed + (dx / dist) * 2;
         cone.vy = Math.sin(car.angle) * pushSpeed + (dy / dist) * 2;
-        cone.spin = (Math.random() - 0.5) * 0.5;
+        cone.spin = (Math.random() - 0.5) * 0.4;
         cone.hit = true;
-        // Tiny speed reduction for player
-        if (car.id === 0) car.speed *= 0.98;
+        if (car.id === 0) car.speed *= 0.99;
       }
     }
-    // Physics
     cone.x += cone.vx;
     cone.y += cone.vy;
-    cone.vx *= 0.95;
-    cone.vy *= 0.95;
-    cone.angle += cone.spin;
-    cone.spin *= 0.97;
-    if (cone.hit) cone.alpha = Math.max(0, cone.alpha - 0.003);
+    cone.vx *= 0.93;
+    cone.vy *= 0.93;
+    cone.spin *= 0.95;
+    // Keep cones on track - clamp to track bounds
+    if (track) {
+      const ci = closestCenterlineIndex(cone.x, cone.y);
+      const cp = track.centerline[ci];
+      const cn = track.normals[ci];
+      const toCone = { x: cone.x - cp.x, y: cone.y - cp.y };
+      const dotN = toCone.x * cn.x + toCone.y * cn.y;
+      const hw = TRACK_WIDTH / 2 - 6;
+      if (Math.abs(dotN) > hw) {
+        const sign = dotN > 0 ? 1 : -1;
+        cone.x = cp.x + cn.x * hw * sign;
+        cone.y = cp.y + cn.y * hw * sign;
+        cone.vx *= -0.3;
+        cone.vy *= -0.3;
+      }
+    }
+    if (cone.hit) cone.alpha = Math.max(0, cone.alpha - 0.002);
   }
-  // Remove fully faded cones
   cones = cones.filter(c => c.alpha > 0.01);
 }
 
@@ -562,23 +569,26 @@ function drawCones() {
   for (const cone of cones) {
     ctx.save();
     ctx.translate(cone.x, cone.y);
-    ctx.rotate(cone.angle);
     ctx.globalAlpha = cone.alpha;
-    // Orange cone body
+    // Base - dark square
+    ctx.fillStyle = '#333';
+    ctx.fillRect(-5, -5, 10, 10);
+    // Cone body - orange circle from top
     ctx.beginPath();
-    ctx.moveTo(0, -5);
-    ctx.lineTo(-4, 5);
-    ctx.lineTo(4, 5);
-    ctx.closePath();
+    ctx.arc(0, 0, 4, 0, Math.PI * 2);
     ctx.fillStyle = '#ff6600';
     ctx.fill();
+    // White ring
+    ctx.beginPath();
+    ctx.arc(0, 0, 2.5, 0, Math.PI * 2);
     ctx.strokeStyle = '#fff';
     ctx.lineWidth = 1;
-    // White stripe
-    ctx.beginPath();
-    ctx.moveTo(-2, 1);
-    ctx.lineTo(2, 1);
     ctx.stroke();
+    // Tip dot
+    ctx.beginPath();
+    ctx.arc(0, 0, 1, 0, Math.PI * 2);
+    ctx.fillStyle = '#ff8833';
+    ctx.fill();
     ctx.globalAlpha = 1;
     ctx.restore();
   }
@@ -1062,14 +1072,17 @@ function updateRacer(r, dt, allRacers) {
     }
   }
 
-  const COL_DIST = CAR_LENGTH;
   for (const other of allRacers) {
     if (other.id === r.id) continue;
     const dx = other.x - r.x;
     const dy = other.y - r.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
-    if (dist < COL_DIST && dist > 0.1) {
-      const overlap = COL_DIST - dist;
+    // Elliptical collision: longer front/back, shorter sides
+    const contactAngle = Math.atan2(dy, dx) - r.angle;
+    const sideFactor = Math.abs(Math.sin(contactAngle));
+    const colDist = CAR_LENGTH * (1 - sideFactor * 0.6); // full length front/back, 40% on sides
+    if (dist < colDist && dist > 0.1) {
+      const overlap = colDist - dist;
       const nx = dx / dist;
       const ny = dy / dist;
       r.x -= nx * overlap * 0.5;
@@ -1331,14 +1344,16 @@ function updatePlayer(r, dt) {
   }
 
   // Car-car collision with push physics
-  const COL_DIST_P = CAR_LENGTH;
   for (const other of racers) {
     if (other.id === r.id) continue;
     const dx = other.x - r.x;
     const dy = other.y - r.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
-    if (dist < COL_DIST_P && dist > 0.1) {
-      const overlap = COL_DIST_P - dist;
+    const contactAngle = Math.atan2(dy, dx) - r.angle;
+    const sideFactor = Math.abs(Math.sin(contactAngle));
+    const colDistP = CAR_LENGTH * (1 - sideFactor * 0.6);
+    if (dist < colDistP && dist > 0.1) {
+      const overlap = colDistP - dist;
       const nx = dx / dist;
       const ny = dy / dist;
       r.x -= nx * overlap * 0.4;
@@ -1611,15 +1626,13 @@ function gameLoop(time) {
       for (const r of allCarsVfx) {
         if (r.speed > 1) addExhaust(r.x, r.y, r.angle);
       }
-      // Skid marks for player only - only on hard turns
-      if (player) {
-        if (!player.skidTimer) player.skidTimer = 0;
-        if (Math.abs(player.steerAngle) > 0.04 && player.speed > 3) {
-          player.skidTimer = Math.min(player.skidTimer + 8, 180);
-        }
-        if (player.skidTimer > 0) {
-          addTireMark(player.x, player.y, player.angle, CAR_WIDTH * 0.8);
-          player.skidTimer--;
+      // Skid marks - while actively turning and going fast
+      for (const r of allCarsVfx) {
+        const isTurning = (r.id === 0)
+          ? (keys['ArrowLeft'] || keys['a'] || keys['A'] || keys['ArrowRight'] || keys['d'] || keys['D'])
+          : (Math.abs(r.steerAngle) > 0.08);
+        if (isTurning && r.speed > 3) {
+          addTireMark(r.x, r.y, r.angle, CAR_WIDTH * 0.8);
         }
       }
       // Update cones
