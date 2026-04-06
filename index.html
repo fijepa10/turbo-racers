@@ -496,102 +496,135 @@ function getSpeedMultiplier(r) {
   return 1 + raceProgress * 0.6; // 1.0x at start, 1.6x at final lap finish
 }
 
-// Traffic cones - placed along centerline, can be smashed
-let cones = [];
+// Boost crate system - one at a time on track
+let crate = null;
+let crateDebris = [];
+let crateRespawnTimer = 0;
+const BOOST_DURATION = 480; // 8 seconds at 60fps
+const BOOST_SPEED_MULT = 1.25;
 
-function spawnCones() {
-  cones = [];
-  if (!track) return;
+function spawnCrate() {
+  if (!track || crate) return;
   const cl = track.centerline.length;
-  const numClusters = 4 + Math.floor(Math.random() * 5);
-  for (let c = 0; c < numClusters; c++) {
-    const startIdx = Math.floor(Math.random() * cl);
-    const count = 3 + Math.floor(Math.random() * 6);
-    for (let i = 0; i < count; i++) {
-      const idx = (startIdx + i * 4) % cl;
-      const p = track.centerline[idx];
-      const n = track.normals[idx];
-      const offset = (Math.random() - 0.5) * 15;
-      cones.push({
-        x: p.x + n.x * offset,
-        y: p.y + n.y * offset,
-        vx: 0, vy: 0,
-        spin: 0,
-        hit: false,
-        alpha: 1
-      });
-    }
-  }
-}
-
-function updateCones(allCars) {
-  for (const cone of cones) {
+  // Pick a random spot away from all cars
+  const allCars = [player, ...racers].filter(Boolean);
+  for (let attempts = 0; attempts < 20; attempts++) {
+    const idx = Math.floor(Math.random() * cl);
+    const p = track.centerline[idx];
+    const n = track.normals[idx];
+    const offset = (Math.random() - 0.5) * 20;
+    const cx = p.x + n.x * offset;
+    const cy = p.y + n.y * offset;
+    // Check no car is nearby
+    let tooClose = false;
     for (const car of allCars) {
-      const dx = cone.x - car.x;
-      const dy = cone.y - car.y;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      if (dist < 12 && dist > 0.1) {
-        const pushSpeed = car.speed * 0.7;
-        cone.vx = Math.cos(car.angle) * pushSpeed + (dx / dist) * 2;
-        cone.vy = Math.sin(car.angle) * pushSpeed + (dy / dist) * 2;
-        cone.spin = (Math.random() - 0.5) * 0.4;
-        cone.hit = true;
-        if (car.id === 0) car.speed *= 0.99;
-      }
+      const d = Math.sqrt((car.x - cx) ** 2 + (car.y - cy) ** 2);
+      if (d < 150) { tooClose = true; break; }
     }
-    cone.x += cone.vx;
-    cone.y += cone.vy;
-    cone.vx *= 0.93;
-    cone.vy *= 0.93;
-    cone.spin *= 0.95;
-    // Keep cones on track - clamp to track bounds
-    if (track) {
-      const ci = closestCenterlineIndex(cone.x, cone.y);
-      const cp = track.centerline[ci];
-      const cn = track.normals[ci];
-      const toCone = { x: cone.x - cp.x, y: cone.y - cp.y };
-      const dotN = toCone.x * cn.x + toCone.y * cn.y;
-      const hw = TRACK_WIDTH / 2 - 6;
-      if (Math.abs(dotN) > hw) {
-        const sign = dotN > 0 ? 1 : -1;
-        cone.x = cp.x + cn.x * hw * sign;
-        cone.y = cp.y + cn.y * hw * sign;
-        cone.vx *= -0.3;
-        cone.vy *= -0.3;
-      }
+    if (!tooClose) {
+      crate = { x: cx, y: cy, bob: 0 };
+      return;
     }
-    if (cone.hit) cone.alpha = Math.max(0, cone.alpha - 0.002);
   }
-  cones = cones.filter(c => c.alpha > 0.01);
 }
 
-function drawCones() {
-  for (const cone of cones) {
+function smashCrate(x, y) {
+  // Spawn debris pieces flying outward
+  for (let i = 0; i < 12; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 2 + Math.random() * 4;
+    crateDebris.push({
+      x, y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      size: 2 + Math.random() * 4,
+      spin: (Math.random() - 0.5) * 0.3,
+      angle: Math.random() * Math.PI * 2,
+      life: 40 + Math.random() * 30,
+      maxLife: 70
+    });
+  }
+  crate = null;
+  crateRespawnTimer = 300; // ~5 seconds before next crate
+}
+
+function updateCrate(allCars) {
+  // Respawn timer
+  if (!crate) {
+    crateRespawnTimer--;
+    if (crateRespawnTimer <= 0) spawnCrate();
+  }
+  // Check collision with cars
+  if (crate) {
+    crate.bob += 0.05;
+    for (const car of allCars) {
+      const d = Math.sqrt((car.x - crate.x) ** 2 + (car.y - crate.y) ** 2);
+      if (d < 18) {
+        // Boost this car!
+        car.boostTimer = BOOST_DURATION;
+        smashCrate(crate.x, crate.y);
+        break;
+      }
+    }
+  }
+  // Update debris
+  for (let i = crateDebris.length - 1; i >= 0; i--) {
+    const d = crateDebris[i];
+    d.x += d.vx;
+    d.y += d.vy;
+    d.vx *= 0.96;
+    d.vy *= 0.96;
+    d.angle += d.spin;
+    d.life--;
+    if (d.life <= 0) crateDebris.splice(i, 1);
+  }
+}
+
+function drawCrate() {
+  // Draw debris first
+  for (const d of crateDebris) {
     ctx.save();
-    ctx.translate(cone.x, cone.y);
-    ctx.globalAlpha = cone.alpha;
-    // Base - dark square
-    ctx.fillStyle = '#333';
-    ctx.fillRect(-5, -5, 10, 10);
-    // Cone body - orange circle from top
-    ctx.beginPath();
-    ctx.arc(0, 0, 4, 0, Math.PI * 2);
-    ctx.fillStyle = '#ff6600';
-    ctx.fill();
-    // White ring
-    ctx.beginPath();
-    ctx.arc(0, 0, 2.5, 0, Math.PI * 2);
-    ctx.strokeStyle = '#fff';
-    ctx.lineWidth = 1;
-    ctx.stroke();
-    // Tip dot
-    ctx.beginPath();
-    ctx.arc(0, 0, 1, 0, Math.PI * 2);
-    ctx.fillStyle = '#ff8833';
-    ctx.fill();
+    ctx.translate(d.x, d.y);
+    ctx.rotate(d.angle);
+    ctx.globalAlpha = d.life / d.maxLife;
+    ctx.fillStyle = '#a0722a';
+    ctx.fillRect(-d.size / 2, -d.size / 2, d.size, d.size);
+    ctx.strokeStyle = '#5a3a10';
+    ctx.lineWidth = 0.5;
+    ctx.strokeRect(-d.size / 2, -d.size / 2, d.size, d.size);
     ctx.globalAlpha = 1;
     ctx.restore();
   }
+  // Draw crate
+  if (!crate) return;
+  const bobY = Math.sin(crate.bob) * 2;
+  ctx.save();
+  ctx.translate(crate.x, crate.y + bobY);
+  // Glow
+  ctx.shadowColor = 'rgba(255,200,50,0.6)';
+  ctx.shadowBlur = 15;
+  // Wooden crate - top-down square
+  const s = 10;
+  ctx.fillStyle = '#b8862a';
+  ctx.fillRect(-s, -s, s * 2, s * 2);
+  ctx.strokeStyle = '#6b4c1a';
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(-s, -s, s * 2, s * 2);
+  // Cross planks
+  ctx.beginPath();
+  ctx.moveTo(-s, -s); ctx.lineTo(s, s);
+  ctx.moveTo(s, -s); ctx.lineTo(-s, s);
+  ctx.strokeStyle = '#5a3a10';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  // Question mark or bolt symbol
+  ctx.fillStyle = '#ffd700';
+  ctx.font = 'bold 12px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('⚡', 0, 0);
+  ctx.shadowBlur = 0;
+  ctx.restore();
 }
 
 // Particles: sparks, exhaust, tire marks
@@ -882,6 +915,7 @@ function createRacer(id, startIdx, colorIdx, rng) {
     steerGain,
     cornerCut,
     steerAngle: 0,
+    boostTimer: 0,
     lap: 0,
     progress: startIdx,
     totalProgress: 0,
@@ -1026,7 +1060,9 @@ function updateRacer(r, dt, allRacers) {
 
   r.steerAngle = Math.max(-0.2, Math.min(0.2, r.steerAngle));
 
-  const targetSpeed = r.maxSpeed * getSpeedMultiplier(r);
+  const boostMult = r.boostTimer > 0 ? BOOST_SPEED_MULT : 1;
+  if (r.boostTimer > 0) r.boostTimer--;
+  const targetSpeed = r.maxSpeed * getSpeedMultiplier(r) * boostMult;
   if (r.speed < targetSpeed) {
     r.speed += 0.06;
   } else {
@@ -1190,7 +1226,7 @@ function drawTrack() {
 
   // Tire marks (under cars)
   drawParticles();
-  drawCones();
+  drawCrate();
 
   // Draw racers and player
   for (const r of racers) {
@@ -1298,7 +1334,9 @@ function updatePlayer(r, dt) {
     } else {
       r.speed *= 0.995;
     }
-    const effectiveMax = r.maxSpeed * getSpeedMultiplier(r);
+    const pBoostMult = r.boostTimer > 0 ? BOOST_SPEED_MULT : 1;
+    if (r.boostTimer > 0) r.boostTimer--;
+    const effectiveMax = r.maxSpeed * getSpeedMultiplier(r) * pBoostMult;
     r.speed = Math.max(0, Math.min(effectiveMax, r.speed));
 
     r.angle += r.steerAngle * (0.6 + r.speed / effectiveMax * 0.4);
@@ -1402,7 +1440,7 @@ function updateCamera() {
   camera.x += (targetX - camera.x) * 0.08;
   camera.y += (targetY - camera.y) * 0.08;
 
-  const targetZoom = 2.5;
+  const targetZoom = (player && player.boostTimer > 0) ? 2.0 : 2.5;
   camera.zoom += (targetZoom - camera.zoom) * 0.03;
 }
 
@@ -1636,8 +1674,8 @@ function gameLoop(time) {
         }
       }
       // Update cones
-      const allCarsForCones = [player, ...racers].filter(Boolean);
-      updateCones(allCarsForCones);
+      const allCarsForCrate = [player, ...racers].filter(Boolean);
+      updateCrate(allCarsForCrate);
       updateParticles();
 
       if (finishOrder.length >= mpTotalRacers) {
@@ -1775,7 +1813,7 @@ function initTrackAndRacers(rng) {
 
   camera.x = player.x;
   camera.y = player.y;
-  spawnCones();
+  crate = null; crateDebris = []; crateRespawnTimer = 120;
 }
 
 function startRace(isAutoRestart) {
