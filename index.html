@@ -1525,7 +1525,7 @@ function gameLoop(time) {
         if (r.skidTimer === undefined) { r.skidTimer = 0; r.prevSteer = 0; }
         const steerDelta = Math.abs(r.steerAngle - r.prevSteer);
         r.prevSteer = r.steerAngle;
-        const skidThreshold = (r.id === 0) ? 0.015 : 0.04; // easier for player, harder for bots
+        const skidThreshold = (r.id === 0) ? 0.015 : 0.12; // player triggers easy, bots only on extreme turns
         if (steerDelta > skidThreshold && r.speed > 3) {
           r.skidTimer = Math.min(r.skidTimer + 15, 180);
         }
