@@ -529,10 +529,16 @@ function addExhaust(x, y, angle) {
 }
 
 function addTireMark(x, y, angle, width) {
+  // Two tire lines running ALONG the car's direction
   const perpX = -Math.sin(angle) * width / 2;
   const perpY = Math.cos(angle) * width / 2;
-  tireMarks.push({ x1: x + perpX, y1: y + perpY, x2: x - perpX, y2: y - perpY, alpha: 0.4 });
-  if (tireMarks.length > 3000) tireMarks.shift();
+  const dirX = Math.cos(angle) * 3; // short segment along direction
+  const dirY = Math.sin(angle) * 3;
+  // Left tire
+  tireMarks.push({ x1: x + perpX - dirX, y1: y + perpY - dirY, x2: x + perpX + dirX, y2: y + perpY + dirY, alpha: 0.5 });
+  // Right tire
+  tireMarks.push({ x1: x - perpX - dirX, y1: y - perpY - dirY, x2: x - perpX + dirX, y2: y - perpY + dirY, alpha: 0.5 });
+  if (tireMarks.length > 4000) { tireMarks.splice(0, 2); }
 }
 
 function shakeCamera(intensity) {
