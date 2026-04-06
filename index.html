@@ -1972,9 +1972,9 @@ function gameLoop(time) {
               size: 2 + Math.random() * 3,
             });
           }
-          // Subtle continuous shake during boost for player
-          if (r.id === 0 && Math.random() < 0.3) {
-            camera.shakeTimer = Math.max(camera.shakeTimer, 2);
+          // Constant shake during boost for player
+          if (r.id === 0) {
+            camera.shakeTimer = Math.max(camera.shakeTimer, 5);
           }
         }
       }
