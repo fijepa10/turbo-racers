@@ -7,43 +7,18 @@
 @font-face { font-family: 'LedLight'; src: url('LEDLIGHT.otf') format('opentype'); }
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { background: #111; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; font-family: 'Segoe UI', sans-serif; color: #fff; overflow: hidden; }
-canvas { border: none; }
-#ui {
-  position: absolute; top: 12px; left: 12px;
-  background: linear-gradient(135deg, rgba(0,0,0,0.85), rgba(20,20,30,0.8));
-  padding: 14px 16px; border-radius: 10px; font-size: 13px; min-width: 190px; display: none;
-  border: 1px solid rgba(255,215,0,0.15);
-  backdrop-filter: blur(4px);
-}
-#ui h3 { margin-bottom: 10px; font-size: 13px; color: #ffd700; letter-spacing: 3px; text-transform: uppercase; font-weight: 600; border-bottom: 1px solid rgba(255,215,0,0.2); padding-bottom: 6px; }
-.pos-entry { display: flex; align-items: center; gap: 8px; margin: 4px 0; padding: 3px 4px; border-radius: 4px; transition: background 0.2s; }
-.pos-entry:first-child { background: rgba(255,215,0,0.1); }
-.color-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; box-shadow: 0 0 4px currentColor; }
-#lap-info {
-  position: absolute; top: 12px; right: 12px;
-  background: linear-gradient(135deg, rgba(0,0,0,0.85), rgba(20,20,30,0.8));
-  padding: 10px 16px; border-radius: 10px; font-size: 14px; display: none;
-  border: 1px solid rgba(255,215,0,0.15);
-  backdrop-filter: blur(4px); text-align: center;
-}
-#countdown { position: absolute; font-size: 120px; font-weight: bold; color: #ffd700; text-shadow: 0 0 40px rgba(255,215,0,0.6), 0 0 80px rgba(255,215,0,0.3); z-index: 5; display: none; }
-#finish-screen {
-  position: absolute; display: none; flex-direction: column; align-items: center; gap: 20px;
-  background: linear-gradient(135deg, rgba(0,0,0,0.92), rgba(15,15,25,0.9));
-  padding: 50px 60px; border-radius: 20px; z-index: 10;
-  border: 1px solid rgba(255,215,0,0.2);
-  backdrop-filter: blur(8px);
-}
-#finish-screen h2 { font-size: 42px; color: #ffd700; font-family: 'LedLight', sans-serif; letter-spacing: 4px; text-shadow: 0 0 20px rgba(255,215,0,0.4); }
-#finish-results { font-size: 16px; line-height: 2.2; }
-button {
-  background: linear-gradient(135deg, #ffd700, #ffb800); color: #111; border: none;
-  padding: 14px 40px; font-size: 18px; font-weight: bold; border-radius: 8px;
-  cursor: pointer; transition: transform 0.1s, box-shadow 0.2s;
-  box-shadow: 0 4px 15px rgba(255,215,0,0.3);
-  letter-spacing: 1px;
-}
-button:hover { transform: scale(1.05); box-shadow: 0 6px 25px rgba(255,215,0,0.5); }
+canvas { border: 1px solid #333; }
+#ui { position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,0.7); padding: 12px; border-radius: 8px; font-size: 14px; min-width: 180px; display: none; }
+#ui h3 { margin-bottom: 8px; font-size: 16px; color: #ffd700; }
+.pos-entry { display: flex; align-items: center; gap: 6px; margin: 3px 0; }
+.color-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+#lap-info { position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.7); padding: 12px; border-radius: 8px; font-size: 14px; display: none; }
+#countdown { position: absolute; font-size: 120px; font-weight: bold; color: #ffd700; text-shadow: 0 0 40px rgba(255,215,0,0.6); z-index: 5; display: none; }
+#finish-screen { position: absolute; display: none; flex-direction: column; align-items: center; gap: 16px; background: rgba(0,0,0,0.85); padding: 40px; border-radius: 16px; z-index: 10; }
+#finish-screen h2 { font-size: 36px; color: #ffd700; font-family: 'LedLight', sans-serif; }
+#finish-results { font-size: 18px; line-height: 2; }
+button { background: #ffd700; color: #111; border: none; padding: 14px 40px; font-size: 20px; font-weight: bold; border-radius: 8px; cursor: pointer; transition: transform 0.1s; }
+button:hover { transform: scale(1.05); }
 
 /* ---- Main Menu ---- */
 #main-menu {
@@ -1535,14 +1510,12 @@ function updateUI() {
   const posDiv = document.getElementById('positions');
   posDiv.innerHTML = sorted.map((r, i) => {
     const lapDisplay = Math.min(r.lap, TOTAL_LAPS);
-    const isPlayer = r.id === 0;
-    const posColor = i === 0 ? '#ffd700' : i === 1 ? '#c0c0c0' : i === 2 ? '#cd7f32' : '#666';
-    const finished = r.finished ? '<span style="color:#4f4;font-size:10px;margin-left:4px">FIN</span>' : '';
-    return `<div class="pos-entry" style="${isPlayer ? 'background:rgba(255,215,0,0.08);' : ''}">
-      <span style="color:${posColor};width:18px;font-weight:bold;font-size:14px">${i + 1}</span>
+    const status = r.finished ? ' (FINISHED)' : '';
+    return `<div class="pos-entry">
+      <span style="color:#aaa;width:16px">${i + 1}.</span>
       <span class="color-dot" style="background:${r.color}"></span>
-      <span style="color:${isPlayer ? '#fff' : '#bbb'};font-weight:${isPlayer ? '600' : '400'}">${r.name}</span>
-      <span style="color:#555;margin-left:auto;font-size:11px">L${lapDisplay}${finished}</span>
+      <span style="color:${r.color}">${r.name}</span>
+      <span style="color:#666;margin-left:auto">L${lapDisplay}${status}</span>
     </div>`;
   }).join('');
 
@@ -1555,8 +1528,7 @@ function updateUI() {
     const cl = track.centerline.length;
     const pct = Math.max(0, Math.min(100, (player.totalProgress / (cl * TOTAL_LAPS)) * 100)).toFixed(1);
     const lapInfo = document.getElementById('lap-info');
-    const currentLap = Math.min(leader ? leader.lap + 1 : 1, TOTAL_LAPS);
-    lapInfo.innerHTML = `<div style="color:#ffd700;font-size:11px;letter-spacing:2px;text-transform:uppercase;margin-bottom:4px">Lap</div><div style="font-size:28px;font-weight:bold">${currentLap}<span style="color:#555;font-size:16px"> / ${TOTAL_LAPS}</span></div><div style="margin-top:6px;height:3px;background:#333;border-radius:2px;overflow:hidden"><div style="height:100%;width:${pct}%;background:linear-gradient(90deg,#ffd700,#ff6600);border-radius:2px;transition:width 0.3s"></div></div><div style="color:#777;font-size:10px;margin-top:3px">${pct}%</div>`;
+    lapInfo.innerHTML = `Lap <span id="lap-current">${Math.min(leader ? leader.lap + 1 : 1, TOTAL_LAPS)}</span> / <span id="lap-total">${TOTAL_LAPS}</span><br><span style="color:#aaa;font-size:12px">Race: ${pct}%</span>`;
   }
 }
 
