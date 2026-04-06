@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: turbo-racers-server
+    runtime: node
+    rootDir: server
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: PORT
+        value: 10000
