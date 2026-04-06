@@ -416,8 +416,11 @@ let engineStarted = false;
 
 // Collision sounds
 let scrapeBuffer = null, crash1Buffer = null, crash2Buffer = null;
+let thrustBuffer = null, crateSmashBuffer = null;
 let scrapeSource = null, scrapeGain = null;
+let thrustSource = null, thrustGain = null;
 let scraping = false;
+let thrusting = false;
 let lastCrashTime = 0;
 
 function initAudio() {
@@ -431,6 +434,38 @@ function initAudio() {
   fetch('scrape.mp3').then(r => r.arrayBuffer()).then(buf => audioCtx.decodeAudioData(buf)).then(d => { scrapeBuffer = d; });
   fetch('crash1.mp3').then(r => r.arrayBuffer()).then(buf => audioCtx.decodeAudioData(buf)).then(d => { crash1Buffer = d; });
   fetch('crash2.mp3').then(r => r.arrayBuffer()).then(buf => audioCtx.decodeAudioData(buf)).then(d => { crash2Buffer = d; });
+  fetch('thrust.mp3').then(r => r.arrayBuffer()).then(buf => audioCtx.decodeAudioData(buf)).then(d => { thrustBuffer = d; });
+  fetch('crate.mp3').then(r => r.arrayBuffer()).then(buf => audioCtx.decodeAudioData(buf)).then(d => { crateSmashBuffer = d; });
+}
+
+function playCrateSmash() {
+  if (!audioCtx || !crateSmashBuffer) return;
+  const src = audioCtx.createBufferSource();
+  const gain = audioCtx.createGain();
+  src.buffer = crateSmashBuffer;
+  gain.gain.value = 0.6;
+  src.connect(gain);
+  gain.connect(audioCtx.destination);
+  src.start();
+}
+
+function startThrust() {
+  if (thrusting || !thrustBuffer || !audioCtx) return;
+  thrusting = true;
+  thrustSource = audioCtx.createBufferSource();
+  thrustGain = audioCtx.createGain();
+  thrustSource.buffer = thrustBuffer;
+  thrustSource.loop = true;
+  thrustGain.gain.value = 0.5;
+  thrustSource.connect(thrustGain);
+  thrustGain.connect(audioCtx.destination);
+  thrustSource.start();
+}
+
+function stopThrust() {
+  if (!thrusting) return;
+  thrusting = false;
+  if (thrustSource) { try { thrustSource.stop(); } catch(e) {} thrustSource = null; }
 }
 
 function playCrash() {
@@ -575,6 +610,8 @@ function updateCrate(allCars) {
         // Boost this car!
         car.boostTimer = BOOST_DURATION;
         smashCrate(crate.x, crate.y, car.angle);
+        playCrateSmash();
+        if (car.id === 0) startThrust();
         break;
       }
     }
@@ -1389,7 +1426,10 @@ function updatePlayer(r, dt) {
       r.speed *= 0.995;
     }
     const pBoostMult = r.boostTimer > 0 ? BOOST_SPEED_MULT : 1;
-    if (r.boostTimer > 0) r.boostTimer--;
+    if (r.boostTimer > 0) {
+      r.boostTimer--;
+      if (r.boostTimer <= 0) stopThrust();
+    }
     const effectiveMax = r.maxSpeed * getSpeedMultiplier(r) * pBoostMult;
     r.speed = Math.max(0, Math.min(effectiveMax, r.speed));
 
