@@ -1520,8 +1520,14 @@ function gameLoop(time) {
       const allCarsVfx = [player, ...racers].filter(Boolean);
       for (const r of allCarsVfx) {
         if (r.speed > 1) addExhaust(r.x, r.y, r.angle);
-        if (Math.abs(r.steerAngle) > 0.03 && r.speed > 2) {
+        // Skid: trigger at hard steering, then keep going for at least 60 frames
+        if (!r.skidTimer) r.skidTimer = 0;
+        if (Math.abs(r.steerAngle) > 0.07 && r.speed > 3) {
+          r.skidTimer = 60; // ~1 second minimum
+        }
+        if (r.skidTimer > 0) {
           addTireMark(r.x, r.y, r.angle, CAR_WIDTH * 0.8);
+          r.skidTimer--;
         }
       }
       updateParticles();
