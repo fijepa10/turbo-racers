@@ -30,6 +30,23 @@ wss.on('connection', (ws) => {
     try { msg = JSON.parse(data); } catch { return; }
 
     switch (msg.type) {
+      case 'list_rooms': {
+        const roomList = [];
+        for (const [code, room] of rooms) {
+          if (room.state === 'lobby') {
+            const humanCount = room.players.filter(p => !p.isAI).length;
+            roomList.push({
+              code: code,
+              host: room.players.find(p => p.isHost)?.username || 'Unknown',
+              players: humanCount,
+              trackLength: room.trackLength
+            });
+          }
+        }
+        ws.send(JSON.stringify({ type: 'room_list', rooms: roomList }));
+        break;
+      }
+
       case 'create_room': {
         const result = createRoom(ws, msg.username, msg.color, msg.trackLength);
         ws.playerId = result.playerId;

@@ -296,7 +296,11 @@ button:hover { transform: scale(1.05); }
       <div class="mp-color-picker" id="mp-join-colors"></div>
     </div>
     <div class="mp-field">
-      <label>Room Code</label>
+      <label>Available Rooms</label>
+      <div id="mp-room-browser" style="max-height:120px;overflow-y:auto;background:rgba(0,0,0,0.3);border-radius:6px;padding:6px;margin-bottom:8px;font-size:13px;color:#aaa">Loading...</div>
+    </div>
+    <div class="mp-field">
+      <label>Or Enter Code</label>
       <input type="text" class="mp-input mp-code-input" id="mp-join-code" maxlength="4" placeholder="ABCD">
     </div>
     <button class="mp-btn" id="mp-join-btn" onclick="mpJoinRoom()">JOIN</button>
@@ -353,7 +357,8 @@ button:hover { transform: scale(1.05); }
 <div id="finish-screen">
   <h2>RACE FINISHED!</h2>
   <div id="finish-results"></div>
-  <button onclick="showMainMenu()">MAIN MENU</button>
+  <button onclick="resetRace()">NEW RACE</button>
+  <button onclick="showMainMenu()" style="background:#555;color:#fff">MAIN MENU</button>
 </div>
 
 <script>
@@ -1180,12 +1185,21 @@ function createRacer(id, startIdx, colorIdx, rng) {
 
 function updateRacer(r, dt, allRacers) {
   if (r.finished) {
-    r.speed *= 0.97;
-    if (r.speed > 0.5) {
+    // Slow to a stop and line up in finish order with spacing
+    r.speed *= 0.96;
+    if (r.speed > 0.3) {
       const ci = closestCenterlineIndexNear(r.x, r.y, r.progress);
-      const ahead = (ci + 15) % track.centerline.length;
+      // Each finished car targets a point further ahead based on finish position
+      const finishPos = finishOrder.indexOf(r);
+      const spacing = (finishPos >= 0 ? finishPos : 0) * 12;
+      const ahead = (ci + 20 + spacing) % track.centerline.length;
       const target = track.centerline[ahead];
-      const toT = Math.atan2(target.y - r.y, target.x - r.x);
+      const norm = track.normals[ahead];
+      // Lateral offset so they don't stack on center
+      const lateralOffset = (finishPos % 2 === 0 ? 1 : -1) * 10;
+      const tx = target.x + norm.x * lateralOffset;
+      const ty = target.y + norm.y * lateralOffset;
+      const toT = Math.atan2(ty - r.y, tx - r.x);
       let diff = toT - r.angle;
       while (diff > Math.PI) diff -= Math.PI * 2;
       while (diff < -Math.PI) diff += Math.PI * 2;
@@ -1509,12 +1523,21 @@ function drawCar(r) {
 
 function updatePlayer(r, dt) {
   if (r.finished) {
-    r.speed *= 0.97;
-    if (r.speed > 0.5) {
+    // Slow to a stop and line up in finish order with spacing
+    r.speed *= 0.96;
+    if (r.speed > 0.3) {
       const ci = closestCenterlineIndexNear(r.x, r.y, r.progress);
-      const ahead = (ci + 15) % track.centerline.length;
+      // Each finished car targets a point further ahead based on finish position
+      const finishPos = finishOrder.indexOf(r);
+      const spacing = (finishPos >= 0 ? finishPos : 0) * 12;
+      const ahead = (ci + 20 + spacing) % track.centerline.length;
       const target = track.centerline[ahead];
-      const toT = Math.atan2(target.y - r.y, target.x - r.x);
+      const norm = track.normals[ahead];
+      // Lateral offset so they don't stack on center
+      const lateralOffset = (finishPos % 2 === 0 ? 1 : -1) * 10;
+      const tx = target.x + norm.x * lateralOffset;
+      const ty = target.y + norm.y * lateralOffset;
+      const toT = Math.atan2(ty - r.y, tx - r.x);
       let diff = toT - r.angle;
       while (diff > Math.PI) diff -= Math.PI * 2;
       while (diff < -Math.PI) diff += Math.PI * 2;
@@ -2227,6 +2250,14 @@ function mpSwitchTab(tab) {
   document.getElementById('mp-waiting-panel').classList.remove('active');
   document.getElementById('mp-error').textContent = '';
   mpLobbyState = 'pick';
+  if (tab === 'join') mpRefreshRooms();
+}
+
+var mpRoomRefreshInterval = null;
+function mpRefreshRooms() {
+  if (ws && ws.readyState === 1) {
+    ws.send(JSON.stringify({ type: 'list_rooms' }));
+  }
 }
 
 function mpBuildColorPickers() {
@@ -2324,7 +2355,7 @@ function connectToServer(url) {
       reject(e);
       return;
     }
-    ws.onopen = function() { resolve(); };
+    ws.onopen = function() { mpRefreshRooms(); resolve(); };
     ws.onerror = function() { reject(new Error('Connection failed')); };
     ws.onclose = function() {
       if (isMultiplayer && raceState === 'racing') {
@@ -2378,6 +2409,21 @@ function mpHandleMessage(msg) {
     case 'player_left':
       mpPlayers = msg.players;
       mpUpdatePlayerList();
+      break;
+
+    case 'room_list':
+      var browser = document.getElementById('mp-room-browser');
+      if (!msg.rooms || msg.rooms.length === 0) {
+        browser.innerHTML = '<div style="color:#666;text-align:center;padding:8px">No rooms available. Create one!</div>';
+      } else {
+        browser.innerHTML = msg.rooms.map(function(rm) {
+          return '<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 6px;cursor:pointer;border-radius:4px;margin:2px 0" onmouseover="this.style.background=\'rgba(255,215,0,0.1)\'" onmouseout="this.style.background=\'none\'" onclick="document.getElementById(\'mp-join-code\').value=\'' + rm.code + '\'">' +
+            '<span style="color:#ffd700">' + rm.host + '</span>' +
+            '<span style="color:#888">' + rm.players + '/6 - ' + rm.trackLength + '</span>' +
+            '<span style="color:#ffd700;font-weight:bold">' + rm.code + '</span>' +
+          '</div>';
+        }).join('');
+      }
       break;
 
     case 'error':
