@@ -281,7 +281,7 @@ canvas.height = window.innerHeight;
 
 const TOTAL_LAPS = 3;
 const TRACK_WIDTH = 90;
-const CAR_LENGTH = 22;
+const CAR_LENGTH = 30;
 const CAR_WIDTH = 5;
 const NUM_RACERS = 5;
 const RAY_COUNT = 9;
@@ -528,11 +528,19 @@ function addExhaust(x, y, angle) {
   });
 }
 
+let lastTireMark = null;
 function addTireMark(x, y, angle, width) {
   const perpX = -Math.sin(angle) * width / 2;
   const perpY = Math.cos(angle) * width / 2;
-  tireMarks.push({ x1: x + perpX, y1: y + perpY, x2: x - perpX, y2: y - perpY, alpha: 0.6 });
-  if (tireMarks.length > 2000) tireMarks.shift();
+  const lx = x + perpX, ly = y + perpY; // left tire
+  const rx = x - perpX, ry = y - perpY; // right tire
+  if (lastTireMark) {
+    // Connect to previous mark for continuous streaks
+    tireMarks.push({ x1: lastTireMark.lx, y1: lastTireMark.ly, x2: lx, y2: ly, alpha: 0.7 });
+    tireMarks.push({ x1: lastTireMark.rx, y1: lastTireMark.ry, x2: rx, y2: ry, alpha: 0.7 });
+  }
+  lastTireMark = { lx, ly, rx, ry };
+  if (tireMarks.length > 4000) { tireMarks.splice(0, 2); }
 }
 
 function shakeCamera(intensity) {
@@ -562,8 +570,8 @@ function drawParticles() {
     const m = tireMarks[i];
     m.alpha *= 0.999;
     if (m.alpha < 0.02) { tireMarks.splice(i, 1); continue; }
-    ctx.strokeStyle = `rgba(20,20,20,${m.alpha})`;
-    ctx.lineWidth = 2;
+    ctx.strokeStyle = `rgba(15,15,15,${m.alpha})`;
+    ctx.lineWidth = 3;
     ctx.beginPath();
     ctx.moveTo(m.x1, m.y1);
     ctx.lineTo(m.x2, m.y2);
@@ -1516,6 +1524,8 @@ function gameLoop(time) {
         if (r.speed > 1) addExhaust(r.x, r.y, r.angle);
         if (Math.abs(r.steerAngle) > 0.06 && r.speed > 3) {
           addTireMark(r.x, r.y, r.angle, CAR_WIDTH * 0.8);
+        } else {
+          lastTireMark = null; // break the streak when not skidding
         }
       }
       updateParticles();
