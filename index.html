@@ -1130,7 +1130,7 @@ function updateRacer(r, dt, allRacers) {
   }
 
   const movedDist = Math.sqrt((r.x - r.lastX) ** 2 + (r.y - r.lastY) ** 2);
-  if (movedDist < 0.5) {
+  if (r.speed > 1 && movedDist < 0.5) {
     r.stuckTimer += dt;
   } else {
     r.stuckTimer = Math.max(0, r.stuckTimer - dt * 2);
@@ -1138,7 +1138,7 @@ function updateRacer(r, dt, allRacers) {
   r.lastX = r.x;
   r.lastY = r.y;
 
-  if (r.stuckTimer > 1500) {
+  if (r.stuckTimer > 3000) {
     const ci = closestCenterlineIndex(r.x, r.y);
     const ahead = (ci + 5) % track.centerline.length;
     r.x = track.centerline[ahead].x;
@@ -1458,16 +1458,16 @@ function updatePlayer(r, dt) {
     return;
   }
 
-  // Stuck detection for player too
+  // Stuck detection for player - only after they've started moving
   const pMovedDist = Math.sqrt((r.x - r.lastX) ** 2 + (r.y - r.lastY) ** 2);
-  if (pMovedDist < 0.5) {
+  if (r.speed > 1 && pMovedDist < 0.5) {
     r.stuckTimer += dt;
   } else {
     r.stuckTimer = Math.max(0, r.stuckTimer - dt * 2);
   }
   r.lastX = r.x;
   r.lastY = r.y;
-  if (r.stuckTimer > 1000) {
+  if (r.stuckTimer > 3000) {
     const ci = closestCenterlineIndex(r.x, r.y);
     const ahead = (ci + 10) % track.centerline.length;
     r.x = track.centerline[ahead].x;
@@ -2853,9 +2853,9 @@ function teDone() {
 }
 
 function openTrackEditorSP() {
-  teFromSinglePlayer = true;
   document.getElementById('setup-screen').style.display = 'none';
-  openTrackEditor();
+  teOpen();
+  teFromSinglePlayer = true; // set AFTER teOpen which resets it to false
 }
 
 function teCleanup() {
