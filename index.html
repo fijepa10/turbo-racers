@@ -2029,25 +2029,12 @@ function gameLoop(time) {
           // In multiplayer, skip updateRacer for remote human players (they're interpolated)
           if (isMultiplayer && r._isRemoteHuman) {
             mpInterpolateRemote(r, dt);
-            // Still do progress tracking for remote humans
-            if (track) {
-              const newProg = closestCenterlineIndexNear(r.x, r.y, r.progress);
-              const cl = track.centerline.length;
-              let delta = newProg - r.progress;
-              if (delta > cl / 2) delta -= cl;
-              if (delta < -cl / 2) delta += cl;
-              if (delta > 0 && delta < cl / 4) r.totalProgress += delta;
-              r.progress = newProg;
-              const lapProgress = r.totalProgress / cl;
-              const newLap = Math.floor(lapProgress);
-              if (newLap > r.lap) {
-                r.lap = newLap;
-                if (r.lap >= TOTAL_LAPS && !r.finished) {
-                  r.finished = true;
-                  r.finishTime = performance.now();
-                  finishOrder.push(r);
-                }
-              }
+            // Progress/lap for remote humans comes from server relay - don't compute locally
+            // Finish detection based on server-relayed lap count
+            if (r.lap >= TOTAL_LAPS && !r.finished) {
+              r.finished = true;
+              r.finishTime = performance.now();
+              finishOrder.push(r);
             }
           } else {
             updateRacer(r, dt, allCars);
@@ -2750,6 +2737,7 @@ function mpSendInput() {
     speed: player.speed,
     lap: player.lap,
     progress: player.progress,
+    totalProgress: player.totalProgress,
     boostTimer: player.boostTimer || 0
   }));
 }
@@ -2772,8 +2760,10 @@ function mpHandleStateUpdate(remotePlayers) {
           target.targetAngle = rp.angle;
           target.targetSpeed = rp.speed;
         }
-        // Update lap/progress/boost directly
+        // Update lap/progress/boost directly from server
         if (rp.lap !== undefined) racers[ri].lap = rp.lap;
+        if (rp.progress !== undefined) racers[ri].progress = rp.progress;
+        if (rp.totalProgress !== undefined) racers[ri].totalProgress = rp.totalProgress;
         if (rp.boostTimer !== undefined) racers[ri].boostTimer = rp.boostTimer;
         break;
       }
@@ -3121,16 +3111,16 @@ function teCleanup() {
 
 function generateTrackFromPoints(userPoints) {
   // 1) Catmull-Rom spline to smooth user points into more points
-  var numDesired = 800;
+  var numDesired = 1200;
   var splined = catmullRomLoop(userPoints, numDesired);
 
   // 2) Resample to evenly spaced points
   var resampled = resampleLoop(splined, numDesired);
 
-  // 3) Smooth passes (same as generateTrack)
+  // 3) Smooth passes - more passes for user-drawn tracks which can be rougher
   var centerline = resampled;
-  var minRadius = TRACK_WIDTH / 2 + 10;
-  for (var pass = 0; pass < 5; pass++) {
+  var minRadius = TRACK_WIDTH / 2 + 15;
+  for (var pass = 0; pass < 10; pass++) {
     var smoothed = [];
     for (var i = 0; i < centerline.length; i++) {
       var prev = centerline[(i - 1 + centerline.length) % centerline.length];
