@@ -1620,8 +1620,11 @@ function updatePlayer(r, dt) {
 
 function updateCamera() {
   if (!player) return;
-  // NaN protection - reset to track start if position corrupted
-  if (isNaN(player.x) || isNaN(player.y)) {
+  // Debug: log position to title bar to catch what's happening
+  document.title = 'x:' + Math.round(player.x) + ' y:' + Math.round(player.y) + ' s:' + player.speed.toFixed(1) + ' cx:' + Math.round(camera.x) + ' cy:' + Math.round(camera.y);
+
+  // NaN protection
+  if (isNaN(player.x) || isNaN(player.y) || !isFinite(player.x) || !isFinite(player.y)) {
     player.x = track.centerline[0].x;
     player.y = track.centerline[0].y;
     player.speed = 0;
