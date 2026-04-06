@@ -535,11 +535,15 @@ function smashCrate(x, y, carAngle) {
     { w: 11, h: 4 }, { w: 13, h: 3 }, { w: 9, h: 5 }, { w: 14, h: 4 }
   ];
   for (const plank of planks) {
-    const spreadAngle = carAngle + (Math.random() - 0.5) * 2.5;
-    const speed = 2 + Math.random() * 5;
+    // Pieces fly forward in car's direction with some spread
+    const spreadAngle = carAngle + (Math.random() - 0.5) * 1.2;
+    const speed = 3 + Math.random() * 5;
+    // Offset slightly behind the impact point
+    const offsetX = -Math.cos(carAngle) * 4 + (Math.random() - 0.5) * 6;
+    const offsetY = -Math.sin(carAngle) * 4 + (Math.random() - 0.5) * 6;
     crateDebris.push({
-      x: x + (Math.random() - 0.5) * 8,
-      y: y + (Math.random() - 0.5) * 8,
+      x: x + offsetX,
+      y: y + offsetY,
       vx: Math.cos(spreadAngle) * speed,
       vy: Math.sin(spreadAngle) * speed,
       w: plank.w,
