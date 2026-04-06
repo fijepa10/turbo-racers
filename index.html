@@ -1521,17 +1521,16 @@ function gameLoop(time) {
       const allCarsVfx = [player, ...racers].filter(Boolean);
       for (const r of allCarsVfx) {
         if (r.speed > 1) addExhaust(r.x, r.y, r.angle);
-        // Skid: trigger on sudden steering change, lasts ~1 second
-        if (r.skidTimer === undefined) { r.skidTimer = 0; r.prevSteer = 0; }
-        const steerDelta = Math.abs(r.steerAngle - r.prevSteer);
-        r.prevSteer = r.steerAngle;
-        const skidThreshold = (r.id === 0) ? 0.015 : 0.12; // player triggers easy, bots only on extreme turns
-        if (steerDelta > skidThreshold && r.speed > 3) {
-          r.skidTimer = Math.min(r.skidTimer + 15, 180);
+      }
+      // Skid marks for player only
+      if (player) {
+        if (!player.skidTimer) player.skidTimer = 0;
+        if (Math.abs(player.steerAngle) > 0.025 && player.speed > 2) {
+          player.skidTimer = Math.min(player.skidTimer + 10, 180);
         }
-        if (r.skidTimer > 0) {
-          addTireMark(r.x, r.y, r.angle, CAR_WIDTH * 0.8);
-          r.skidTimer--;
+        if (player.skidTimer > 0) {
+          addTireMark(player.x, player.y, player.angle, CAR_WIDTH * 0.8);
+          player.skidTimer--;
         }
       }
       updateParticles();
