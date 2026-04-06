@@ -628,7 +628,7 @@ function spawnCrate() {
   if (!track || crate) return;
   const cl = track.centerline.length;
   const rnd = crateRng || Math.random;
-  // Pick a random spot on the track (deterministic in multiplayer)
+  const allCarsLocal = [player, ...racers].filter(Boolean);
   for (let attempts = 0; attempts < 20; attempts++) {
     const idx = Math.floor(rnd() * cl);
     const p = track.centerline[idx];
@@ -636,9 +636,8 @@ function spawnCrate() {
     const offset = (rnd() - 0.5) * 20;
     const cx = p.x + n.x * offset;
     const cy = p.y + n.y * offset;
-    // Check no car is nearby
     let tooClose = false;
-    for (const car of allCars) {
+    for (const car of allCarsLocal) {
       const d = Math.sqrt((car.x - cx) ** 2 + (car.y - cy) ** 2);
       if (d < 150) { tooClose = true; break; }
     }
@@ -1620,9 +1619,6 @@ function updatePlayer(r, dt) {
 
 function updateCamera() {
   if (!player) return;
-  // Debug: log position to title bar to catch what's happening
-  document.title = 'x:' + Math.round(player.x) + ' y:' + Math.round(player.y) + ' s:' + player.speed.toFixed(1) + ' cx:' + Math.round(camera.x) + ' cy:' + Math.round(camera.y);
-
   // NaN protection
   if (isNaN(player.x) || isNaN(player.y) || !isFinite(player.x) || !isFinite(player.y)) {
     player.x = track.centerline[0].x;
