@@ -353,7 +353,7 @@ button:hover { transform: scale(1.05); }
 <div id="finish-screen">
   <h2>RACE FINISHED!</h2>
   <div id="finish-results"></div>
-  <button onclick="resetRace()">NEW RACE</button>
+  <button onclick="showMainMenu()">MAIN MENU</button>
 </div>
 
 <script>
@@ -416,15 +416,6 @@ const TRACK_PRESETS = {
 };
 
 // ---- Screen management ----
-function showMainMenu() {
-  document.getElementById('main-menu').style.display = 'flex';
-  document.getElementById('setup-screen').style.display = 'none';
-  document.getElementById('finish-screen').style.display = 'none';
-  document.getElementById('mp-lobby').style.display = 'none';
-  document.getElementById('ui').style.display = 'none';
-  document.getElementById('lap-info').style.display = 'none';
-}
-
 function showComingSoon() {
   const msg = document.getElementById('coming-soon-msg');
   msg.style.display = 'block';
@@ -447,6 +438,19 @@ function showMainMenu() {
   document.getElementById('track-editor').style.display = 'none';
   document.getElementById('round-info-overlay').style.display = 'none';
   document.getElementById('final-standings').style.display = 'none';
+  // Stop all audio and clear race state
+  stopAllAudio();
+  track = null;
+  player = null;
+  racers = [];
+  raceState = 'idle';
+}
+
+function stopAllAudio() {
+  stopScrape();
+  stopThrust();
+  if (engineSource) { try { engineSource.stop(); } catch(e) {} engineSource = null; engineStarted = false; }
+  if (engineGain) engineGain.gain.value = 0;
 }
 
 function selectTrackLength(len, btn) {
@@ -551,6 +555,21 @@ function stopThrust() {
   if (!thrusting) return;
   thrusting = false;
   if (thrustSource) { try { thrustSource.stop(); } catch(e) {} thrustSource = null; }
+}
+
+function playCountdownBeep(isGo) {
+  if (!audioCtx) initAudio();
+  if (!audioCtx) return;
+  var osc = audioCtx.createOscillator();
+  var gain = audioCtx.createGain();
+  osc.type = 'sine';
+  osc.frequency.value = isGo ? 880 : 440; // high pitch for GO, low for countdown
+  gain.gain.value = 0.3;
+  gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + (isGo ? 0.5 : 0.2));
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.start();
+  osc.stop(audioCtx.currentTime + (isGo ? 0.5 : 0.2));
 }
 
 function playCrash() {
@@ -1977,6 +1996,7 @@ function gameLoop(time) {
 let testRaceCount = 0;
 const testResults = [];
 function showFinish() {
+  stopAllAudio();
   const screen = document.getElementById('finish-screen');
   const results = document.getElementById('finish-results');
   results.innerHTML = finishOrder.map((r, i) => {
@@ -2118,12 +2138,15 @@ function startRace(isAutoRestart) {
   } else {
     let count = 3;
     cdEl.textContent = count;
+    playCountdownBeep(false);
     const interval = setInterval(() => {
       count--;
       if (count > 0) {
         cdEl.textContent = count;
+        playCountdownBeep(false);
       } else if (count === 0) {
         cdEl.textContent = 'GO!';
+        playCountdownBeep(true);
       } else {
         cdEl.style.display = 'none';
         raceState = 'racing';
