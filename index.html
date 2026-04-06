@@ -2,37 +2,270 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>AI Race</title>
+<title>TURBO RACERS</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { background: #111; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; font-family: 'Segoe UI', sans-serif; color: #fff; overflow: hidden; }
 canvas { border: 1px solid #333; }
-#ui { position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,0.7); padding: 12px; border-radius: 8px; font-size: 14px; min-width: 180px; }
+#ui { position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,0.7); padding: 12px; border-radius: 8px; font-size: 14px; min-width: 180px; display: none; }
 #ui h3 { margin-bottom: 8px; font-size: 16px; color: #ffd700; }
 .pos-entry { display: flex; align-items: center; gap: 6px; margin: 3px 0; }
 .color-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
-#lap-info { position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.7); padding: 12px; border-radius: 8px; font-size: 14px; }
-#start-screen { position: absolute; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; z-index: 10; }
-#start-screen h1 { font-size: 48px; color: #ffd700; text-shadow: 0 0 20px rgba(255,215,0,0.5); }
-#start-screen p { color: #aaa; font-size: 16px; }
-button { background: #ffd700; color: #111; border: none; padding: 14px 40px; font-size: 20px; font-weight: bold; border-radius: 8px; cursor: pointer; transition: transform 0.1s; }
-button:hover { transform: scale(1.05); }
+#lap-info { position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.7); padding: 12px; border-radius: 8px; font-size: 14px; display: none; }
 #countdown { position: absolute; font-size: 120px; font-weight: bold; color: #ffd700; text-shadow: 0 0 40px rgba(255,215,0,0.6); z-index: 5; display: none; }
 #finish-screen { position: absolute; display: none; flex-direction: column; align-items: center; gap: 16px; background: rgba(0,0,0,0.85); padding: 40px; border-radius: 16px; z-index: 10; }
 #finish-screen h2 { font-size: 36px; color: #ffd700; }
 #finish-results { font-size: 18px; line-height: 2; }
+button { background: #ffd700; color: #111; border: none; padding: 14px 40px; font-size: 20px; font-weight: bold; border-radius: 8px; cursor: pointer; transition: transform 0.1s; }
+button:hover { transform: scale(1.05); }
+
+/* ---- Main Menu ---- */
+#main-menu {
+  position: absolute; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 24px; z-index: 10;
+}
+#main-menu h1 {
+  font-size: 64px; color: #ffd700; text-shadow: 0 0 30px rgba(255,215,0,0.5), 0 4px 12px rgba(0,0,0,0.8);
+  letter-spacing: 8px; font-weight: 900;
+}
+#main-menu p.subtitle {
+  color: #888; font-size: 15px; margin-top: -12px; letter-spacing: 3px; text-transform: uppercase;
+}
+.menu-btn {
+  width: 280px; text-align: center; padding: 16px 0; font-size: 22px; letter-spacing: 2px;
+}
+.menu-btn.secondary {
+  background: #333; color: #888; border: 2px solid #555;
+}
+.menu-btn.secondary:hover { background: #444; transform: scale(1.02); }
+.coming-soon-tooltip {
+  color: #ff6644; font-size: 13px; margin-top: -16px; display: none;
+}
+
+/* ---- Setup Screen ---- */
+#setup-screen {
+  position: absolute; display: none; flex-direction: column; align-items: center; gap: 20px; z-index: 10;
+  background: rgba(10,10,10,0.95); padding: 40px 48px; border-radius: 16px; border: 1px solid #333;
+  max-height: 90vh; overflow-y: auto;
+}
+#setup-screen h2 {
+  font-size: 32px; color: #ffd700; letter-spacing: 4px; margin-bottom: 4px;
+}
+.setup-section {
+  width: 100%; text-align: center;
+}
+.setup-section label {
+  display: block; color: #aaa; font-size: 14px; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 10px;
+}
+.track-length-btns {
+  display: flex; gap: 10px; justify-content: center;
+}
+.track-length-btns button {
+  padding: 10px 24px; font-size: 16px; background: #222; color: #ccc; border: 2px solid #444; border-radius: 6px;
+  cursor: pointer; transition: all 0.15s;
+}
+.track-length-btns button:hover { border-color: #ffd700; color: #fff; }
+.track-length-btns button.selected {
+  background: #ffd700; color: #111; border-color: #ffd700; transform: scale(1.05);
+}
+
+.car-picker {
+  display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;
+}
+.car-thumb {
+  width: 64px; height: 64px; border: 3px solid #333; border-radius: 10px; cursor: pointer;
+  background: #1a1a1a; display: flex; align-items: center; justify-content: center;
+  transition: all 0.15s; position: relative; overflow: hidden;
+}
+.car-thumb img {
+  max-width: 48px; max-height: 48px; object-fit: contain; image-rendering: pixelated;
+}
+.car-thumb:hover { border-color: #888; }
+.car-thumb.selected { border-color: #ffd700; box-shadow: 0 0 12px rgba(255,215,0,0.5); background: #2a2500; }
+.car-thumb .color-label {
+  position: absolute; bottom: 2px; font-size: 9px; color: #888; text-transform: uppercase;
+}
+
+.username-input {
+  background: #1a1a1a; border: 2px solid #444; border-radius: 6px; color: #fff; padding: 10px 16px;
+  font-size: 18px; text-align: center; width: 240px; outline: none; font-family: inherit;
+}
+.username-input:focus { border-color: #ffd700; }
+.username-input::placeholder { color: #555; }
+
+#start-race-btn {
+  margin-top: 8px; padding: 16px 56px; font-size: 24px; letter-spacing: 3px;
+}
+#back-to-menu-btn {
+  background: transparent; color: #666; font-size: 14px; padding: 8px 16px; margin-top: -8px;
+}
+#back-to-menu-btn:hover { color: #aaa; }
+
+/* ---- Multiplayer Lobby ---- */
+#mp-lobby {
+  position: absolute; display: none; flex-direction: column; align-items: center; gap: 16px; z-index: 10;
+  background: rgba(10,10,10,0.95); padding: 32px 40px; border-radius: 16px; border: 1px solid #333;
+  max-height: 90vh; overflow-y: auto; min-width: 380px;
+}
+#mp-lobby h2 { font-size: 28px; color: #ffd700; letter-spacing: 4px; margin-bottom: 0; }
+.mp-tabs { display: flex; gap: 0; width: 100%; }
+.mp-tab {
+  flex: 1; text-align: center; padding: 10px 0; font-size: 15px; font-weight: bold; letter-spacing: 2px;
+  background: #1a1a1a; color: #666; border: 2px solid #333; cursor: pointer; transition: all 0.15s;
+}
+.mp-tab:first-child { border-radius: 6px 0 0 6px; }
+.mp-tab:last-child { border-radius: 0 6px 6px 0; }
+.mp-tab.active { background: #2a2500; color: #ffd700; border-color: #ffd700; }
+.mp-tab:hover:not(.active) { color: #aaa; }
+.mp-panel { display: none; width: 100%; flex-direction: column; align-items: center; gap: 14px; }
+.mp-panel.active { display: flex; }
+.mp-field { width: 100%; text-align: center; }
+.mp-field label { display: block; color: #aaa; font-size: 12px; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 6px; }
+.mp-input {
+  background: #1a1a1a; border: 2px solid #444; border-radius: 6px; color: #fff; padding: 10px 16px;
+  font-size: 18px; text-align: center; width: 200px; outline: none; font-family: inherit;
+}
+.mp-input:focus { border-color: #ffd700; }
+.mp-input::placeholder { color: #555; }
+.mp-code-input { width: 140px; font-size: 28px; letter-spacing: 8px; text-transform: uppercase; font-weight: bold; }
+.mp-room-code { font-size: 48px; color: #ffd700; font-weight: 900; letter-spacing: 12px; text-shadow: 0 0 20px rgba(255,215,0,0.4); margin: 8px 0; }
+.mp-room-label { color: #888; font-size: 12px; text-transform: uppercase; letter-spacing: 2px; }
+.mp-player-list { width: 100%; max-width: 300px; }
+.mp-player-entry {
+  display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 6px; margin: 2px 0;
+  background: rgba(255,255,255,0.03);
+}
+.mp-player-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+.mp-player-name { color: #ccc; font-size: 15px; }
+.mp-player-tag { color: #ffd700; font-size: 11px; font-weight: bold; margin-left: 4px; }
+.mp-btn { padding: 12px 36px; font-size: 18px; letter-spacing: 2px; }
+.mp-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+.mp-btn.start-race { background: #44cc44; color: #111; }
+.mp-btn.start-race:hover:not(:disabled) { background: #55dd55; }
+.mp-back-btn { background: transparent; color: #666; font-size: 14px; padding: 8px 16px; }
+.mp-back-btn:hover { color: #aaa; }
+.mp-error { color: #ff4444; font-size: 13px; min-height: 18px; }
+.mp-status { color: #888; font-size: 13px; }
+.mp-color-picker { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+.mp-color-opt {
+  width: 36px; height: 36px; border-radius: 50%; border: 3px solid #333; cursor: pointer; transition: all 0.15s;
+}
+.mp-color-opt:hover { border-color: #888; transform: scale(1.1); }
+.mp-color-opt.selected { border-color: #ffd700; box-shadow: 0 0 10px rgba(255,215,0,0.5); }
+.mp-track-btns { display: flex; gap: 8px; justify-content: center; }
+.mp-track-btns button {
+  padding: 8px 18px; font-size: 14px; background: #222; color: #ccc; border: 2px solid #444; border-radius: 6px;
+  cursor: pointer; transition: all 0.15s;
+}
+.mp-track-btns button:hover { border-color: #ffd700; color: #fff; }
+.mp-track-btns button.selected { background: #ffd700; color: #111; border-color: #ffd700; }
+#mp-countdown-overlay {
+  position: absolute; font-size: 120px; font-weight: bold; color: #ffd700;
+  text-shadow: 0 0 40px rgba(255,215,0,0.6); z-index: 15; display: none;
+}
 </style>
 </head>
 <body>
 <canvas id="c"></canvas>
 <div id="ui"><h3>Positions</h3><div id="positions"></div></div>
 <div id="lap-info">Lap <span id="lap-current">0</span> / <span id="lap-total">3</span></div>
-<div id="start-screen">
-  <h1>AI RACE</h1>
-  <p>Race against 5 AI opponents on a random track</p>
-  <p style="color:#666;font-size:13px;margin-top:-10px">Arrow keys or WASD to drive</p>
-  <button onclick="startRace()">START RACE</button>
+
+<!-- Main Menu -->
+<div id="main-menu">
+  <h1>TURBO RACERS</h1>
+  <p class="subtitle">High speed thrills</p>
+  <button class="menu-btn" onclick="showSetup()">SINGLE PLAYER</button>
+  <button class="menu-btn secondary" onclick="showMultiplayerLobby()">MULTIPLAYER</button>
+  <p class="coming-soon-tooltip" id="coming-soon-msg">COMING SOON</p>
+  <p style="color:#555;font-size:12px;margin-top:8px">Arrow keys or WASD to drive</p>
 </div>
+
+<!-- Single Player Setup -->
+<div id="setup-screen">
+  <h2>RACE SETUP</h2>
+
+  <div class="setup-section">
+    <label>Track Length</label>
+    <div class="track-length-btns">
+      <button onclick="selectTrackLength('short', this)" data-track="short">SHORT</button>
+      <button onclick="selectTrackLength('medium', this)" data-track="medium" class="selected">MEDIUM</button>
+      <button onclick="selectTrackLength('long', this)" data-track="long">LONG</button>
+    </div>
+  </div>
+
+  <div class="setup-section">
+    <label>Choose Your Car</label>
+    <div class="car-picker" id="car-picker"></div>
+  </div>
+
+  <div class="setup-section">
+    <label>Driver Name</label>
+    <input type="text" class="username-input" id="username-input" maxlength="12" placeholder="Player" value="Player">
+  </div>
+
+  <button id="start-race-btn" onclick="startRaceFromSetup()">START RACE</button>
+  <button id="back-to-menu-btn" onclick="showMainMenu()">BACK</button>
+</div>
+
+<!-- Multiplayer Lobby -->
+<div id="mp-lobby">
+  <h2>MULTIPLAYER</h2>
+  <div class="mp-tabs">
+    <div class="mp-tab active" onclick="mpSwitchTab('create')">CREATE ROOM</div>
+    <div class="mp-tab" onclick="mpSwitchTab('join')">JOIN ROOM</div>
+  </div>
+  <div class="mp-error" id="mp-error"></div>
+
+  <!-- Create Room Panel -->
+  <div class="mp-panel active" id="mp-create-panel">
+    <div class="mp-field">
+      <label>Driver Name</label>
+      <input type="text" class="mp-input" id="mp-create-name" maxlength="12" placeholder="Player" value="Player">
+    </div>
+    <div class="mp-field">
+      <label>Car Color</label>
+      <div class="mp-color-picker" id="mp-create-colors"></div>
+    </div>
+    <div class="mp-field">
+      <label>Track Length</label>
+      <div class="mp-track-btns" id="mp-track-btns">
+        <button onclick="mpSelectTrack('short',this)">SHORT</button>
+        <button class="selected" onclick="mpSelectTrack('medium',this)">MEDIUM</button>
+        <button onclick="mpSelectTrack('long',this)">LONG</button>
+      </div>
+    </div>
+    <button class="mp-btn" id="mp-create-btn" onclick="mpCreateRoom()">CREATE</button>
+  </div>
+
+  <!-- Join Room Panel -->
+  <div class="mp-panel" id="mp-join-panel">
+    <div class="mp-field">
+      <label>Driver Name</label>
+      <input type="text" class="mp-input" id="mp-join-name" maxlength="12" placeholder="Player" value="Player">
+    </div>
+    <div class="mp-field">
+      <label>Car Color</label>
+      <div class="mp-color-picker" id="mp-join-colors"></div>
+    </div>
+    <div class="mp-field">
+      <label>Room Code</label>
+      <input type="text" class="mp-input mp-code-input" id="mp-join-code" maxlength="4" placeholder="ABCD">
+    </div>
+    <button class="mp-btn" id="mp-join-btn" onclick="mpJoinRoom()">JOIN</button>
+  </div>
+
+  <!-- Waiting Room (shown after create/join) -->
+  <div class="mp-panel" id="mp-waiting-panel">
+    <div class="mp-room-label">ROOM CODE</div>
+    <div class="mp-room-code" id="mp-room-code-display"></div>
+    <div class="mp-player-list" id="mp-player-list"></div>
+    <div class="mp-status" id="mp-waiting-status">Waiting for players...</div>
+    <button class="mp-btn start-race" id="mp-start-btn" onclick="mpStartGame()" style="display:none" disabled>START RACE</button>
+  </div>
+
+  <button class="mp-back-btn" onclick="mpGoBack()">BACK</button>
+</div>
+
+<div id="mp-countdown-overlay"></div>
 <div id="countdown"></div>
 <div id="finish-screen">
   <h2>RACE FINISHED!</h2>
@@ -56,6 +289,8 @@ const RAY_LENGTH = 200;
 
 const COLORS = ['#3399ff', '#ff4444', '#bbbbbb', '#44ff44', '#cc44ff', '#ffaa00'];
 const NAMES = ['YOU', 'Red Fury', 'Chrome', 'Green Machine', 'Purple Phantom', 'Gold Rush'];
+const SPRITE_FILE_LIST = ['car.png', 'red.png', 'chrome.png', 'green.png', 'purple.png', 'gold.png'];
+const COLOR_LABELS = ['Blue', 'Red', 'Chrome', 'Green', 'Purple', 'Gold'];
 const TOTAL_RACERS = 6; // 1 player + 5 AI
 
 // Car sprites - one per color, loaded from individual files
@@ -85,6 +320,91 @@ let camera = { x: 0, y: 0, zoom: 1.2, shakeX: 0, shakeY: 0, shakeTimer: 0 };
 let raceState = 'idle';
 let finishOrder = [];
 const AUTOPILOT = false;
+
+// ---- Setup state ----
+let selectedTrackLength = 'medium';
+let selectedCarColorIndex = 0;
+let playerUsername = 'Player';
+
+const TRACK_PRESETS = {
+  short:  { baseRadiusMin: 500, baseRadiusMax: 700, numPoints: 800 },
+  medium: { baseRadiusMin: 900, baseRadiusMax: 1300, numPoints: 1200 },
+  long:   { baseRadiusMin: 1400, baseRadiusMax: 1800, numPoints: 1600 },
+};
+
+// ---- Screen management ----
+function showMainMenu() {
+  document.getElementById('main-menu').style.display = 'flex';
+  document.getElementById('setup-screen').style.display = 'none';
+  document.getElementById('finish-screen').style.display = 'none';
+  document.getElementById('mp-lobby').style.display = 'none';
+  document.getElementById('ui').style.display = 'none';
+  document.getElementById('lap-info').style.display = 'none';
+}
+
+function showComingSoon() {
+  const msg = document.getElementById('coming-soon-msg');
+  msg.style.display = 'block';
+  setTimeout(function() { msg.style.display = 'none'; }, 2000);
+}
+
+function showSetup() {
+  document.getElementById('main-menu').style.display = 'none';
+  document.getElementById('setup-screen').style.display = 'flex';
+  buildCarPicker();
+}
+
+function showMainMenu() {
+  document.getElementById('main-menu').style.display = 'flex';
+  document.getElementById('setup-screen').style.display = 'none';
+  document.getElementById('finish-screen').style.display = 'none';
+  document.getElementById('mp-lobby').style.display = 'none';
+  document.getElementById('ui').style.display = 'none';
+  document.getElementById('lap-info').style.display = 'none';
+}
+
+function selectTrackLength(len, btn) {
+  selectedTrackLength = len;
+  var btns = document.querySelectorAll('.track-length-btns button');
+  for (var i = 0; i < btns.length; i++) btns[i].classList.remove('selected');
+  btn.classList.add('selected');
+}
+
+function buildCarPicker() {
+  var picker = document.getElementById('car-picker');
+  picker.innerHTML = '';
+  for (var i = 0; i < COLORS.length; i++) {
+    var div = document.createElement('div');
+    div.className = 'car-thumb' + (i === selectedCarColorIndex ? ' selected' : '');
+    div.setAttribute('data-index', i);
+    div.onclick = (function(idx, el) {
+      return function() {
+        selectedCarColorIndex = idx;
+        var all = document.querySelectorAll('.car-thumb');
+        for (var j = 0; j < all.length; j++) all[j].classList.remove('selected');
+        el.classList.add('selected');
+      };
+    })(i, div);
+    var img = document.createElement('img');
+    img.src = SPRITE_FILE_LIST[i];
+    img.alt = COLOR_LABELS[i];
+    div.appendChild(img);
+    var label = document.createElement('span');
+    label.className = 'color-label';
+    label.textContent = COLOR_LABELS[i];
+    div.appendChild(label);
+    picker.appendChild(div);
+  }
+}
+
+function startRaceFromSetup() {
+  var input = document.getElementById('username-input');
+  playerUsername = (input.value.trim() || 'Player').substring(0, 12);
+  document.getElementById('setup-screen').style.display = 'none';
+  document.getElementById('ui').style.display = 'block';
+  document.getElementById('lap-info').style.display = 'block';
+  startRace();
+}
 
 // Engine sound - pitch scales with speed
 let audioCtx = null;
@@ -272,26 +592,25 @@ window.addEventListener('keyup', e => { keys[e.key] = false; keys[e.code] = fals
 
 // ---- Track Generation ----
 
-function generateTrack() {
+function generateTrack(trackBaseRadius, trackNumPoints, rng) {
+  const rand = rng || Math.random;
   const cx = canvas.width / 2;
   const cy = canvas.height / 2;
-  const baseRadius = 900 + Math.random() * 400;
+  const baseRadius = trackBaseRadius || (900 + rand() * 400);
+  const numPoints = trackNumPoints || 1200;
 
   // Use sum of random sine waves for smooth radius variation.
-  // This guarantees smooth, non-self-intersecting shapes because
-  // the radius is a continuous function of angle.
-  const numWaves = 4 + Math.floor(Math.random() * 4); // 4-7 waves
+  const numWaves = 4 + Math.floor(rand() * 4); // 4-7 waves
   const waves = [];
   for (let i = 0; i < numWaves; i++) {
     waves.push({
-      freq: 2 + Math.floor(Math.random() * 4),  // 2-5 lobes
-      amp: 0.08 + Math.random() * 0.18,          // 8-26% of base radius
-      phase: Math.random() * Math.PI * 2
+      freq: 2 + Math.floor(rand() * 4),  // 2-5 lobes
+      amp: 0.08 + rand() * 0.18,          // 8-26% of base radius
+      phase: rand() * Math.PI * 2
     });
   }
 
   // Generate centerline points directly at fine resolution
-  const numPoints = 1200;
   const centerline = [];
   for (let i = 0; i < numPoints; i++) {
     const angle = (i / numPoints) * Math.PI * 2;
@@ -299,7 +618,7 @@ function generateTrack() {
     for (const w of waves) {
       r += baseRadius * w.amp * Math.sin(angle * w.freq + w.phase);
     }
-    // Clamp minimum radius - high enough to prevent wall crossings on curves
+    // Clamp minimum radius
     r = Math.max(baseRadius * 0.55, r);
     centerline.push({
       x: cx + Math.cos(angle) * r,
@@ -308,21 +627,18 @@ function generateTrack() {
   }
 
   // Smooth centerline and enforce minimum curve radius > track half-width
-  // This prevents wall crossings while keeping the track the same width everywhere
-  const minRadius = TRACK_WIDTH / 2 + 10; // walls need at least this much curve radius
+  const minRadius = TRACK_WIDTH / 2 + 10;
   for (let pass = 0; pass < 5; pass++) {
     const smoothed = [];
     for (let i = 0; i < centerline.length; i++) {
       const prev = centerline[(i - 1 + centerline.length) % centerline.length];
       const cur = centerline[i];
       const next = centerline[(i + 1) % centerline.length];
-      // Check local curvature
       const dx1 = cur.x - prev.x, dy1 = cur.y - prev.y;
       const dx2 = next.x - cur.x, dy2 = next.y - cur.y;
       const cross = Math.abs(dx1 * dy2 - dy1 * dx2);
       const segLen = Math.sqrt(dx1 * dx1 + dy1 * dy1) || 1;
       const localRadius = (segLen * segLen) / (cross + 0.001);
-      // Smooth more aggressively where radius is too small
       const blend = localRadius < minRadius ? 0.15 : 0.5;
       smoothed.push({
         x: cur.x * blend + (prev.x + next.x) * ((1 - blend) / 2),
@@ -354,7 +670,7 @@ function generateTrack() {
   }
   const totalLength = distances[distances.length - 1];
 
-  // Build walls - uniform width, prevent crossings by clamping curvature in centerline
+  // Build walls
   const hw = TRACK_WIDTH / 2;
   const innerWall = centerline.map((p, i) => ({ x: p.x + normals[i].x * hw, y: p.y + normals[i].y * hw }));
   const outerWall = centerline.map((p, i) => ({ x: p.x - normals[i].x * hw, y: p.y - normals[i].y * hw }));
@@ -400,7 +716,6 @@ function castRay(ox, oy, angle, maxDist) {
 }
 
 // ---- Find closest centerline index ----
-// Global search - used for wall collision (needs to be accurate anywhere)
 function closestCenterlineIndex(x, y) {
   let best = Infinity, bestIdx = 0;
   for (let i = 0; i < track.centerline.length; i += 3) {
@@ -420,10 +735,9 @@ function closestCenterlineIndex(x, y) {
   return bestIdx;
 }
 
-// Local search - used for progress tracking (prevents jumping to wrong track section)
 function closestCenterlineIndexNear(x, y, currentIdx) {
   const cl = track.centerline.length;
-  const range = 60; // only search ±60 points from current position
+  const range = 60;
   let best = Infinity, bestIdx = currentIdx;
   for (let offset = -range; offset <= range; offset++) {
     const i = ((currentIdx + offset) % cl + cl) % cl;
@@ -437,18 +751,18 @@ function closestCenterlineIndexNear(x, y, currentIdx) {
 
 // ---- Racer (AI Agent) ----
 
-function createRacer(id, startIdx) {
+function createRacer(id, startIdx, colorIdx, rng) {
+  const rand = rng || Math.random;
   const p = track.centerline[startIdx];
   const next = track.centerline[(startIdx + 1) % track.centerline.length];
   const angle = Math.atan2(next.y - p.y, next.x - p.x);
 
-  // Personality differences that create natural spread
   const maxSpeed = 5.0;
-  const passDesire = 0.5 + Math.random() * 0.5;
-  const lineOffset = (Math.random() - 0.5) * 0.35;      // preferred lateral offset
-  const lookAheadBase = 15 + Math.floor(Math.random() * 25); // 15-39: short=reactive, long=smooth
-  const steerGain = 0.10 + Math.random() * 0.10;        // 0.10-0.20: big range = very different cornering
-  const cornerCut = 0.1 + Math.random() * 0.5;          // 0.1-0.6: cautious to very aggressive inside cuts
+  const passDesire = 0.5 + rand() * 0.5;
+  const lineOffset = (rand() - 0.5) * 0.35;
+  const lookAheadBase = 15 + Math.floor(rand() * 25);
+  const steerGain = 0.10 + rand() * 0.10;
+  const cornerCut = 0.1 + rand() * 0.5;
 
   return {
     id,
@@ -469,11 +783,10 @@ function createRacer(id, startIdx) {
     crossedStart: false,
     finished: false,
     finishTime: 0,
-    color: COLORS[id],
-    name: NAMES[id],
+    color: COLORS[colorIdx !== undefined ? colorIdx : id],
+    name: NAMES[colorIdx !== undefined ? colorIdx : id],
     rays: new Array(RAY_COUNT).fill(RAY_LENGTH),
     targetSteer: 0,
-    // Stuck detection
     stuckTimer: 0,
     lastX: p.x,
     lastY: p.y,
@@ -483,7 +796,6 @@ function createRacer(id, startIdx) {
 
 function updateRacer(r, dt, allRacers) {
   if (r.finished) {
-    // Slow down and follow the track instead of gliding off
     r.speed *= 0.97;
     if (r.speed > 0.5) {
       const ci = closestCenterlineIndexNear(r.x, r.y, r.progress);
@@ -501,7 +813,6 @@ function updateRacer(r, dt, allRacers) {
     return;
   }
 
-  // --- Stuck detection ---
   const movedDist = Math.sqrt((r.x - r.lastX) ** 2 + (r.y - r.lastY) ** 2);
   if (movedDist < 0.5) {
     r.stuckTimer += dt;
@@ -524,7 +835,6 @@ function updateRacer(r, dt, allRacers) {
     return;
   }
 
-  // --- Cast rays (used for passing and emergency wall avoidance) ---
   const raySpread = Math.PI * 0.8;
   for (let i = 0; i < RAY_COUNT; i++) {
     const frac = (i / (RAY_COUNT - 1)) - 0.5;
@@ -532,7 +842,6 @@ function updateRacer(r, dt, allRacers) {
     r.rays[i] = castRay(r.x, r.y, rayAngle, RAY_LENGTH);
   }
 
-  // --- Detect other cars (check ahead only, not behind) ---
   let nearestCarDist = Infinity;
   let nearestCarSide = 0;
   let nearestCarAhead = false;
@@ -545,7 +854,6 @@ function updateRacer(r, dt, allRacers) {
       let relAngle = Math.atan2(dy, dx) - r.angle;
       while (relAngle > Math.PI) relAngle -= Math.PI * 2;
       while (relAngle < -Math.PI) relAngle += Math.PI * 2;
-      // Only care about cars roughly ahead (within ±90 degrees)
       if (Math.abs(relAngle) < Math.PI * 0.6) {
         nearestCarDist = dist;
         nearestCarSide = relAngle > 0 ? 1 : -1;
@@ -554,9 +862,6 @@ function updateRacer(r, dt, allRacers) {
     }
   }
 
-  // --- Steering: autopilot-style direct steering toward racing line ---
-
-  // 1. Compute racing line using this bot's personal driving style
   const cl = track.centerline.length;
   const lookAhead = r.lookAheadBase;
   const curveCheckFar = r.lookAheadBase * 2;
@@ -566,45 +871,39 @@ function updateRacer(r, dt, allRacers) {
   const aheadPt = track.centerline[targetIdx];
   const farPt = track.centerline[farIdx];
 
-  // Cross product = turn direction
   const dx1 = aheadPt.x - curPt.x, dy1 = aheadPt.y - curPt.y;
   const dx2 = farPt.x - aheadPt.x, dy2 = farPt.y - aheadPt.y;
   const cross = dx1 * dy2 - dy1 * dx2;
   const curvature = Math.max(-1, Math.min(1, cross * 0.003));
 
   const tNorm = track.normals[targetIdx];
-  const insideOffset = -curvature * TRACK_WIDTH * r.cornerCut; // personal corner-cutting aggression
+  const insideOffset = -curvature * TRACK_WIDTH * r.cornerCut;
   const personalOffset = r.lineOffset * TRACK_WIDTH;
   let targetX = aheadPt.x + tNorm.x * (insideOffset + personalOffset);
   let targetY = aheadPt.y + tNorm.y * (insideOffset + personalOffset);
 
-  // 2. Passing: when a car is ahead, commit to going around it
   if (nearestCarAhead && nearestCarDist < 150) {
     const leftSpace = (r.rays[0] + r.rays[1] + r.rays[2]) / 3;
     const rightSpace = (r.rays[6] + r.rays[7] + r.rays[8]) / 3;
     const passUrgency = r.passDesire * (1 - nearestCarDist / 150);
     let passOffset = 0;
-    // Pick the side with more room and commit hard
     if (leftSpace > rightSpace + 5) {
       passOffset = -passUrgency * TRACK_WIDTH * 0.4;
     } else if (rightSpace > leftSpace + 5) {
       passOffset = passUrgency * TRACK_WIDTH * 0.4;
     } else {
-      // Equal space: go opposite side of the other car
       passOffset = -nearestCarSide * passUrgency * TRACK_WIDTH * 0.35;
     }
     targetX += tNorm.x * passOffset;
     targetY += tNorm.y * passOffset;
   }
 
-  // 3. Steer directly toward target with personal steering gain
   const toTarget = Math.atan2(targetY - r.y, targetX - r.x);
   let angleDiff = toTarget - r.angle;
   while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
   while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
   r.steerAngle = angleDiff * r.steerGain;
 
-  // 4. Smooth wall avoidance via rays
   const leftMin = Math.min(r.rays[0], r.rays[1]);
   const rightMin = Math.min(r.rays[RAY_COUNT - 1], r.rays[RAY_COUNT - 2]);
   const frontMin = Math.min(r.rays[3], r.rays[4], r.rays[5]);
@@ -615,29 +914,24 @@ function updateRacer(r, dt, allRacers) {
     r.steerAngle -= (30 - rightMin) / 30 * 0.04;
   }
   if (frontMin < 30) {
-    // Wall dead ahead: steer toward whichever side has more room
     const leftAvg = (r.rays[0] + r.rays[1] + r.rays[2]) / 3;
     const rightAvg = (r.rays[6] + r.rays[7] + r.rays[8]) / 3;
     r.steerAngle += (rightAvg - leftAvg) * 0.002;
   }
 
-  // 5. Clamp steer to prevent wild oscillation
   r.steerAngle = Math.max(-0.2, Math.min(0.2, r.steerAngle));
 
-  // --- Speed: accelerate gradually, scales up as race progresses ---
   const targetSpeed = r.maxSpeed * getSpeedMultiplier(r);
   if (r.speed < targetSpeed) {
-    r.speed += 0.06; // gradual acceleration
+    r.speed += 0.06;
   } else {
     r.speed = targetSpeed;
   }
 
-  // --- Apply movement (identical to autopilot) ---
   r.angle += r.steerAngle;
   r.x += Math.cos(r.angle) * r.speed;
   r.y += Math.sin(r.angle) * r.speed;
 
-  // --- Wall collision: soft push toward centerline ---
   const ci = closestCenterlineIndexNear(r.x, r.y, r.progress);
   const cp = track.centerline[ci];
   const cn = track.normals[ci];
@@ -646,14 +940,12 @@ function updateRacer(r, dt, allRacers) {
   const hw = TRACK_WIDTH / 2 - CAR_WIDTH;
 
   if (Math.abs(dotN) > hw * 0.7) {
-    // Smooth progressive push starting well before the wall
     const overAmount = (Math.abs(dotN) - hw * 0.7) / (hw * 0.3);
-    const pushStrength = overAmount * overAmount * 3.0; // quadratic ramp
+    const pushStrength = overAmount * overAmount * 3.0;
     const sign = dotN > 0 ? 1 : -1;
     r.x -= cn.x * sign * pushStrength;
     r.y -= cn.y * sign * pushStrength;
 
-    // Gently redirect along track direction
     const nextCp = track.centerline[(ci + 5) % track.centerline.length];
     const trackDir = Math.atan2(nextCp.y - cp.y, nextCp.x - cp.x);
     let correctionAngle = trackDir - r.angle;
@@ -661,7 +953,6 @@ function updateRacer(r, dt, allRacers) {
     while (correctionAngle < -Math.PI) correctionAngle += Math.PI * 2;
     r.angle += correctionAngle * overAmount * 0.15;
 
-    // Wall friction - slow down when scraping
     r.speed *= (1 - overAmount * 0.03);
 
     if (Math.abs(dotN) > hw) {
@@ -669,7 +960,6 @@ function updateRacer(r, dt, allRacers) {
       r.y = cp.y + cn.y * hw * sign;
       r.angle += correctionAngle * 0.3;
       r.speed *= 0.95;
-      // Sparks and shake when player hits wall
       if (r.id === 0) {
         addSparks(r.x, r.y, 6);
         shakeCamera(4);
@@ -677,7 +967,6 @@ function updateRacer(r, dt, allRacers) {
     }
   }
 
-  // --- Car-car collision with push ---
   const COL_DIST = (CAR_LENGTH + CAR_WIDTH) / 2;
   for (const other of allRacers) {
     if (other.id === r.id) continue;
@@ -688,23 +977,19 @@ function updateRacer(r, dt, allRacers) {
       const overlap = COL_DIST - dist;
       const nx = dx / dist;
       const ny = dy / dist;
-      // Push apart
       r.x -= nx * overlap * 0.5;
       r.y -= ny * overlap * 0.5;
       other.x += nx * overlap * 0.5;
       other.y += ny * overlap * 0.5;
-      // Push: faster car pushes slower car
       const pushForce = r.speed * 0.1;
       other.x += Math.cos(r.angle) * pushForce;
       other.y += Math.sin(r.angle) * pushForce;
-      // Sparks + sounds
-      const cx = (r.x + other.x) / 2, cy = (r.y + other.y) / 2;
-      addSparks(cx, cy, 3);
+      const colCx = (r.x + other.x) / 2, colCy = (r.y + other.y) / 2;
+      addSparks(colCx, colCy, 3);
       if (r.id === 0 || other.id === 0) { shakeCamera(2); playCrash(); }
     }
   }
 
-  // --- Update progress (local search prevents jumping to wrong track section) ---
   const newProg = closestCenterlineIndexNear(r.x, r.y, r.progress);
   let delta = newProg - r.progress;
   if (delta > cl / 2) delta -= cl;
@@ -714,7 +999,6 @@ function updateRacer(r, dt, allRacers) {
   }
   r.progress = newProg;
 
-  // Lap counting
   const lapProgress = r.totalProgress / cl;
   const newLap = Math.floor(lapProgress);
   if (newLap > r.lap) {
@@ -782,7 +1066,7 @@ function drawTrack() {
   ctx.lineWidth = 4;
   ctx.stroke();
 
-  // Draw checkerboard pattern on start line
+  // Checkerboard pattern on start line
   const startDir = { x: -sn.y, y: sn.x };
   for (let i = 0; i < 8; i++) {
     for (let j = 0; j < 2; j++) {
@@ -831,12 +1115,10 @@ function drawCar(r) {
   }
 
   ctx.restore();
-
 }
 
 function updatePlayer(r, dt) {
   if (r.finished) {
-    // Slow down and follow the track instead of gliding off
     r.speed *= 0.97;
     if (r.speed > 0.5) {
       const ci = closestCenterlineIndexNear(r.x, r.y, r.progress);
@@ -877,7 +1159,6 @@ function updatePlayer(r, dt) {
   }
 
   if (AUTOPILOT) {
-    // TEST MODE: follow centerline at constant max speed
     const lookAhead = 25;
     const targetIdx = (r.progress + lookAhead) % track.centerline.length;
     const target = track.centerline[targetIdx];
@@ -924,8 +1205,6 @@ function updatePlayer(r, dt) {
   const dotN = toCar.x * cn.x + toCar.y * cn.y;
   const hw = TRACK_WIDTH / 2 - CAR_WIDTH;
 
-  // Gradual slowdown near the wall edge
-  // Gradual slowdown and scrape sound near wall
   if (Math.abs(dotN) > hw * 0.7) {
     const nearness = (Math.abs(dotN) - hw * 0.7) / (hw * 0.3);
     r.speed = Math.max(r.maxSpeed * getSpeedMultiplier(r) * 0.3, r.speed * (1 - nearness * 0.04));
@@ -966,12 +1245,10 @@ function updatePlayer(r, dt) {
       const overlap = COL_DIST_P - dist;
       const nx = dx / dist;
       const ny = dy / dist;
-      // Push apart
       r.x -= nx * overlap * 0.4;
       r.y -= ny * overlap * 0.4;
       other.x += nx * overlap * 0.6;
       other.y += ny * overlap * 0.6;
-      // Transfer momentum: push the other car in the player's direction
       const pushForce = r.speed * 0.15;
       other.x += Math.cos(r.angle) * pushForce;
       other.y += Math.sin(r.angle) * pushForce;
@@ -981,7 +1258,7 @@ function updatePlayer(r, dt) {
     }
   }
 
-  // Progress tracking (local search prevents jumping to wrong track section)
+  // Progress tracking
   const newProg = closestCenterlineIndexNear(r.x, r.y, r.progress);
   const cl = track.centerline.length;
   let delta = newProg - r.progress;
@@ -1007,7 +1284,6 @@ function updatePlayer(r, dt) {
 function updateCamera() {
   if (!player) return;
 
-  // Follow the player, with slight look-ahead in driving direction
   const lookAhead = player.speed * 15;
   const targetX = player.x + Math.cos(player.angle) * lookAhead;
   const targetY = player.y + Math.sin(player.angle) * lookAhead;
@@ -1040,19 +1316,149 @@ function updateUI() {
     </div>`;
   }).join('');
 
-  // Show leader's lap
   const leader = sorted[0];
   document.getElementById('lap-current').textContent = Math.min(leader ? leader.lap + 1 : 1, TOTAL_LAPS);
   document.getElementById('lap-total').textContent = TOTAL_LAPS;
 
-  // Speedometer & race completion
   if (player && track) {
     const mph = Math.round(player.speed * 20);
     const cl = track.centerline.length;
     const pct = Math.max(0, Math.min(100, (player.totalProgress / (cl * TOTAL_LAPS)) * 100)).toFixed(1);
     const lapInfo = document.getElementById('lap-info');
-    lapInfo.innerHTML = `Lap <span id="lap-current">${Math.min(leader ? leader.lap + 1 : 1, TOTAL_LAPS)}</span> / <span id="lap-total">${TOTAL_LAPS}</span><br><span style="font-size:18px;color:#ffd700;font-weight:bold">${mph} MPH</span><br><span style="color:#aaa;font-size:12px">Race: ${pct}%</span>`;
+    lapInfo.innerHTML = `Lap <span id="lap-current">${Math.min(leader ? leader.lap + 1 : 1, TOTAL_LAPS)}</span> / <span id="lap-total">${TOTAL_LAPS}</span><br><span style="color:#aaa;font-size:12px">Race: ${pct}%</span>`;
   }
+}
+
+// ---- Speedometer Gauge ----
+
+function drawSpeedometer() {
+  if (!player) return;
+  const mph = Math.round(player.speed * 20);
+  const maxMPH = 200;
+  const radius = 120;
+  const cx = 40 + radius;
+  const cy = canvas.height - 40;
+  const startAngle = Math.PI;
+  const endAngle = 0;
+
+  ctx.save();
+
+  // Dark background
+  ctx.beginPath();
+  ctx.arc(cx, cy, radius + 10, startAngle, endAngle, false);
+  ctx.lineTo(cx + radius + 10, cy + 6);
+  ctx.lineTo(cx - radius - 10, cy + 6);
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(0,0,0,0.75)';
+  ctx.fill();
+
+  // Outer ring glow
+  ctx.beginPath();
+  ctx.arc(cx, cy, radius + 2, startAngle, endAngle, false);
+  ctx.strokeStyle = 'rgba(255,60,60,0.15)';
+  ctx.lineWidth = 6;
+  ctx.stroke();
+
+  // Arc track (grey)
+  ctx.beginPath();
+  ctx.arc(cx, cy, radius, startAngle, endAngle, false);
+  ctx.strokeStyle = '#444';
+  ctx.lineWidth = 8;
+  ctx.stroke();
+
+  // Colored arc showing current speed
+  const speedFraction = Math.min(mph / maxMPH, 1);
+  const needleAngle = startAngle + speedFraction * (endAngle - startAngle);
+  if (speedFraction > 0) {
+    ctx.beginPath();
+    ctx.arc(cx, cy, radius, startAngle, needleAngle, false);
+    const grad = ctx.createLinearGradient(cx - radius, cy, cx + radius, cy);
+    grad.addColorStop(0, '#44ff44');
+    grad.addColorStop(0.5, '#ffdd00');
+    grad.addColorStop(1, '#ff2222');
+    ctx.strokeStyle = grad;
+    ctx.lineWidth = 8;
+    ctx.stroke();
+  }
+
+  // Speed markings
+  const marks = [0, 50, 100, 150, 200];
+  ctx.fillStyle = '#ccc';
+  ctx.font = '11px "Segoe UI", sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  for (const m of marks) {
+    const frac = m / maxMPH;
+    const a = startAngle + frac * (endAngle - startAngle);
+    // Tick mark
+    const innerR = radius - 12;
+    const outerR = radius - 2;
+    ctx.beginPath();
+    ctx.moveTo(cx + Math.cos(a) * innerR, cy + Math.sin(a) * innerR);
+    ctx.lineTo(cx + Math.cos(a) * outerR, cy + Math.sin(a) * outerR);
+    ctx.strokeStyle = '#aaa';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    // Label
+    const labelR = radius - 24;
+    ctx.fillText(m, cx + Math.cos(a) * labelR, cy + Math.sin(a) * labelR);
+  }
+
+  // Minor ticks
+  for (let m = 0; m <= maxMPH; m += 10) {
+    if (m % 50 === 0) continue;
+    const frac = m / maxMPH;
+    const a = startAngle + frac * (endAngle - startAngle);
+    const innerR = radius - 6;
+    const outerR = radius - 2;
+    ctx.beginPath();
+    ctx.moveTo(cx + Math.cos(a) * innerR, cy + Math.sin(a) * innerR);
+    ctx.lineTo(cx + Math.cos(a) * outerR, cy + Math.sin(a) * outerR);
+    ctx.strokeStyle = '#666';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
+
+  // Needle
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(needleAngle);
+  // Needle glow
+  ctx.shadowColor = 'rgba(255,40,40,0.6)';
+  ctx.shadowBlur = 12;
+  ctx.beginPath();
+  ctx.moveTo(radius - 18, 0);
+  ctx.lineTo(-12, -3);
+  ctx.lineTo(-12, 3);
+  ctx.closePath();
+  ctx.fillStyle = '#ff2222';
+  ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.restore();
+
+  // Center cap
+  ctx.beginPath();
+  ctx.arc(cx, cy, 8, 0, Math.PI * 2);
+  ctx.fillStyle = '#cc0000';
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(cx, cy, 4, 0, Math.PI * 2);
+  ctx.fillStyle = '#ff4444';
+  ctx.fill();
+
+  // Digital MPH readout
+  ctx.font = 'bold 22px "Segoe UI", sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#fff';
+  ctx.shadowColor = 'rgba(255,255,255,0.3)';
+  ctx.shadowBlur = 6;
+  ctx.fillText(mph, cx, cy + 20);
+  ctx.shadowBlur = 0;
+  ctx.font = '10px "Segoe UI", sans-serif';
+  ctx.fillStyle = '#888';
+  ctx.fillText('MPH', cx, cy + 34);
+
+  ctx.restore();
 }
 
 // ---- Game Loop ----
@@ -1067,17 +1473,44 @@ function gameLoop(time) {
 
   if (track) {
     if (raceState === 'racing') {
-      // In test mode, run multiple physics steps per frame for faster testing
       const steps = AUTOPILOT ? 8 : 1;
       for (let s = 0; s < steps; s++) {
         if (player) updatePlayer(player, dt);
         const allCars = [player, ...racers].filter(Boolean);
         for (const r of racers) {
-          updateRacer(r, dt, allCars);
+          // In multiplayer, skip updateRacer for remote human players (they're interpolated)
+          if (isMultiplayer && r._isRemoteHuman) {
+            mpInterpolateRemote(r, dt);
+            // Still do progress tracking for remote humans
+            if (track) {
+              const newProg = closestCenterlineIndexNear(r.x, r.y, r.progress);
+              const cl = track.centerline.length;
+              let delta = newProg - r.progress;
+              if (delta > cl / 2) delta -= cl;
+              if (delta < -cl / 2) delta += cl;
+              if (delta > 0 && delta < cl / 4) r.totalProgress += delta;
+              r.progress = newProg;
+              const lapProgress = r.totalProgress / cl;
+              const newLap = Math.floor(lapProgress);
+              if (newLap > r.lap) {
+                r.lap = newLap;
+                if (r.lap >= TOTAL_LAPS && !r.finished) {
+                  r.finished = true;
+                  r.finishTime = performance.now();
+                  finishOrder.push(r);
+                }
+              }
+            }
+          } else {
+            updateRacer(r, dt, allCars);
+          }
         }
-        if (finishOrder.length >= TOTAL_RACERS) break;
+        if (finishOrder.length >= mpTotalRacers) break;
       }
-      // Generate exhaust and tire marks for all cars
+      // In multiplayer, send local player state to server
+      if (isMultiplayer && player && ws && ws.readyState === 1) {
+        mpSendInput();
+      }
       const allCarsVfx = [player, ...racers].filter(Boolean);
       for (const r of allCarsVfx) {
         if (r.speed > 1) addExhaust(r.x, r.y, r.angle);
@@ -1087,13 +1520,11 @@ function gameLoop(time) {
       }
       updateParticles();
 
-      // Check if race is over
-      if (finishOrder.length >= TOTAL_RACERS) {
+      if (finishOrder.length >= mpTotalRacers) {
         raceState = 'finished';
         showFinish();
       }
     }
-    // Camera shake decay
     if (camera.shakeTimer > 0) {
       camera.shakeTimer--;
       camera.shakeX = (Math.random() - 0.5) * camera.shakeTimer * 0.8;
@@ -1105,6 +1536,7 @@ function gameLoop(time) {
     updateCamera();
     updateEngineSound();
     drawTrack();
+    drawSpeedometer();
     updateUI();
   }
 
@@ -1112,7 +1544,7 @@ function gameLoop(time) {
 }
 
 let testRaceCount = 0;
-const testResults = []; // track wins across races
+const testResults = [];
 function showFinish() {
   const screen = document.getElementById('finish-screen');
   const results = document.getElementById('finish-results');
@@ -1121,7 +1553,6 @@ function showFinish() {
     return `<div style="color:${r.color}">${medal} ${i + 1}. ${r.name}</div>`;
   }).join('');
 
-  // TEST: log results and auto-run multiple races
   if (AUTOPILOT) {
     testRaceCount++;
     const playerPos = finishOrder.findIndex(r => r.id === 0) + 1;
@@ -1155,7 +1586,6 @@ function showFinish() {
       screen.style.display = 'flex';
       return;
     }
-    // Auto-restart next race
     setTimeout(() => startRace(true), 200);
     return;
   }
@@ -1163,42 +1593,60 @@ function showFinish() {
   screen.style.display = 'flex';
 }
 
-function initTrackAndRacers() {
-  track = generateTrack();
+function initTrackAndRacers(rng) {
+  // Get track preset
+  const preset = TRACK_PRESETS[selectedTrackLength] || TRACK_PRESETS.medium;
+  const rand = rng || Math.random;
+  const trackRadius = preset.baseRadiusMin + rand() * (preset.baseRadiusMax - preset.baseRadiusMin);
+  track = generateTrack(trackRadius, preset.numPoints, rng);
   racers = [];
   finishOrder = [];
+
+  // Build color/name assignment based on player's chosen color
+  // Player gets selectedCarColorIndex; AI gets the rest in original order
+  var playerColorIdx = selectedCarColorIndex;
+  var aiColorIndices = [];
+  for (var ci = 0; ci < COLORS.length; ci++) {
+    if (ci !== playerColorIdx) aiColorIndices.push(ci);
+  }
 
   // Create all 6 cars with shuffled grid positions
   const gridOrder = [0, 1, 2, 3, 4, 5];
   for (let i = gridOrder.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
+    const j = Math.floor(rand() * (i + 1));
     [gridOrder[i], gridOrder[j]] = [gridOrder[j], gridOrder[i]];
   }
+
+  var aiIdx = 0;
   for (let i = 0; i < TOTAL_RACERS; i++) {
     const gridPos = gridOrder[i];
     const startIdx = track.centerline.length - (gridPos * 3 + 3);
     const idx = ((startIdx % track.centerline.length) + track.centerline.length) % track.centerline.length;
-    const racer = createRacer(i, idx);
-    const n = track.normals[idx];
-    const offset = (gridPos % 2 === 0 ? 1 : -1) * (10 + (gridPos % 3) * 8);
-    racer.x += n.x * offset;
-    racer.y += n.y * offset;
 
     if (i === 0) {
-      // Player car - slightly lower max speed to compensate for
-      // AI steering overhead (wall avoidance, passing, corrections).
-      // A human player will be even slower due to reaction time,
-      // making races competitive.
+      // Player car
+      const racer = createRacer(i, idx, playerColorIdx, rng);
+      racer.name = playerUsername;
       racer.maxSpeed = 5.0;
+      const n = track.normals[idx];
+      const offset = (gridPos % 2 === 0 ? 1 : -1) * (10 + (gridPos % 3) * 8);
+      racer.x += n.x * offset;
+      racer.y += n.y * offset;
       player = racer;
     } else {
+      // AI car - assign from remaining colors
+      const colorIdx = aiColorIndices[aiIdx];
+      aiIdx++;
+      const racer = createRacer(i, idx, colorIdx, rng);
+      const n = track.normals[idx];
+      const offset = (gridPos % 2 === 0 ? 1 : -1) * (10 + (gridPos % 3) * 8);
+      racer.x += n.x * offset;
+      racer.y += n.y * offset;
       racers.push(racer);
     }
   }
 
-  // Initialize totalProgress so crossing index 0 (finish line) = completing a lap.
-  // Cars start near end of centerline, so they need to travel (cl - progress) to reach index 0.
-  // Set totalProgress negative by that amount so lap 1 completes at the finish line.
+  // Initialize totalProgress
   const allInit = [player, ...racers];
   const cl = track.centerline.length;
   for (const c of allInit) {
@@ -1210,8 +1658,11 @@ function initTrackAndRacers() {
 }
 
 function startRace(isAutoRestart) {
-  document.getElementById('start-screen').style.display = 'none';
+  document.getElementById('main-menu').style.display = 'none';
+  document.getElementById('setup-screen').style.display = 'none';
   document.getElementById('finish-screen').style.display = 'none';
+  document.getElementById('ui').style.display = 'block';
+  document.getElementById('lap-info').style.display = 'block';
   if (!isAutoRestart) {
     testRaceCount = 0;
     testResults.length = 0;
@@ -1224,7 +1675,6 @@ function startRace(isAutoRestart) {
   cdEl.style.display = 'block';
 
   if (AUTOPILOT && testRaceCount > 0) {
-    // Skip countdown in test mode after first race
     cdEl.style.display = 'none';
     raceState = 'racing';
     initAudio();
@@ -1249,7 +1699,10 @@ function startRace(isAutoRestart) {
 
 function resetRace() {
   document.getElementById('finish-screen').style.display = 'none';
-  startRace();
+  if (isMultiplayer) {
+    resetRaceMP();
+  }
+  showSetup();
 }
 
 // Handle resize
@@ -1262,8 +1715,483 @@ requestAnimationFrame(gameLoop);
 
 // Auto-start in test mode
 if (AUTOPILOT) {
-  document.getElementById('start-screen').style.display = 'none';
+  document.getElementById('main-menu').style.display = 'none';
   setTimeout(() => { try { startRace(); } catch(e) { document.title = 'ERR: ' + e.message; alert(e.message + '\n' + e.stack); } }, 100);
+}
+
+// ---- Seeded PRNG (Mulberry32) ----
+function createRNG(seed) {
+  var s = seed | 0;
+  return function() {
+    s = (s + 0x6D2B79F5) | 0;
+    var t = Math.imul(s ^ (s >>> 15), 1 | s);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+// ---- Multiplayer State ----
+var ws = null;
+var myPlayerId = null;
+var isMultiplayer = false;
+var mpRoomCode = null;
+var mpIsHost = false;
+var mpPlayers = [];
+var mpSelectedColor = COLORS[0];
+var mpSelectedTrack = 'medium';
+var mpLobbyState = 'pick'; // 'pick' | 'waiting'
+var mpRemotePlayers = {}; // id -> { targetX, targetY, targetAngle, targetSpeed }
+var mpTotalRacers = TOTAL_RACERS;
+var mpSendTimer = 0;
+var MP_SERVER_URL = 'ws://localhost:3000';
+
+// ---- Multiplayer Lobby UI ----
+
+function showMultiplayerLobby() {
+  document.getElementById('main-menu').style.display = 'none';
+  document.getElementById('mp-lobby').style.display = 'flex';
+  mpLobbyState = 'pick';
+  mpSwitchTab('create');
+  mpBuildColorPickers();
+  document.getElementById('mp-error').textContent = '';
+  document.getElementById('mp-waiting-panel').classList.remove('active');
+  document.getElementById('mp-create-panel').classList.add('active');
+}
+
+function mpSwitchTab(tab) {
+  var tabs = document.querySelectorAll('.mp-tab');
+  tabs[0].classList.toggle('active', tab === 'create');
+  tabs[1].classList.toggle('active', tab === 'join');
+  document.getElementById('mp-create-panel').classList.toggle('active', tab === 'create');
+  document.getElementById('mp-join-panel').classList.toggle('active', tab === 'join');
+  document.getElementById('mp-waiting-panel').classList.remove('active');
+  document.getElementById('mp-error').textContent = '';
+  mpLobbyState = 'pick';
+}
+
+function mpBuildColorPickers() {
+  var containers = [document.getElementById('mp-create-colors'), document.getElementById('mp-join-colors')];
+  for (var c = 0; c < containers.length; c++) {
+    var container = containers[c];
+    container.innerHTML = '';
+    for (var i = 0; i < COLORS.length; i++) {
+      var div = document.createElement('div');
+      div.className = 'mp-color-opt' + (COLORS[i] === mpSelectedColor ? ' selected' : '');
+      div.style.background = COLORS[i];
+      div.setAttribute('data-color', COLORS[i]);
+      div.onclick = (function(color) {
+        return function() {
+          mpSelectedColor = color;
+          var allOpts = document.querySelectorAll('.mp-color-opt');
+          for (var j = 0; j < allOpts.length; j++) {
+            allOpts[j].classList.toggle('selected', allOpts[j].getAttribute('data-color') === color);
+          }
+        };
+      })(COLORS[i]);
+      container.appendChild(div);
+    }
+  }
+}
+
+function mpSelectTrack(len, btn) {
+  mpSelectedTrack = len;
+  var btns = document.querySelectorAll('#mp-track-btns button');
+  for (var i = 0; i < btns.length; i++) btns[i].classList.remove('selected');
+  btn.classList.add('selected');
+}
+
+function mpShowWaiting() {
+  document.getElementById('mp-create-panel').classList.remove('active');
+  document.getElementById('mp-join-panel').classList.remove('active');
+  document.getElementById('mp-waiting-panel').classList.add('active');
+  // Hide tabs
+  var tabs = document.querySelectorAll('.mp-tab');
+  for (var i = 0; i < tabs.length; i++) tabs[i].style.display = 'none';
+  mpLobbyState = 'waiting';
+}
+
+function mpUpdatePlayerList() {
+  var list = document.getElementById('mp-player-list');
+  list.innerHTML = '';
+  for (var i = 0; i < mpPlayers.length; i++) {
+    var p = mpPlayers[i];
+    var entry = document.createElement('div');
+    entry.className = 'mp-player-entry';
+    var dot = document.createElement('div');
+    dot.className = 'mp-player-dot';
+    dot.style.background = p.color;
+    entry.appendChild(dot);
+    var name = document.createElement('span');
+    name.className = 'mp-player-name';
+    name.textContent = p.username;
+    entry.appendChild(name);
+    if (p.isHost) {
+      var tag = document.createElement('span');
+      tag.className = 'mp-player-tag';
+      tag.textContent = '(HOST)';
+      entry.appendChild(tag);
+    }
+    if (p.id === myPlayerId) {
+      var youTag = document.createElement('span');
+      youTag.className = 'mp-player-tag';
+      youTag.style.color = '#888';
+      youTag.textContent = '(YOU)';
+      entry.appendChild(youTag);
+    }
+    list.appendChild(entry);
+  }
+
+  // Update start button visibility
+  var startBtn = document.getElementById('mp-start-btn');
+  if (mpIsHost) {
+    startBtn.style.display = '';
+    startBtn.disabled = mpPlayers.length < 2;
+  } else {
+    startBtn.style.display = 'none';
+  }
+
+  var statusEl = document.getElementById('mp-waiting-status');
+  statusEl.textContent = mpPlayers.length + '/6 players' + (mpIsHost ? '' : ' - Waiting for host to start...');
+}
+
+// ---- WebSocket Connection ----
+
+function connectToServer(url) {
+  return new Promise(function(resolve, reject) {
+    try {
+      ws = new WebSocket(url);
+    } catch (e) {
+      reject(e);
+      return;
+    }
+    ws.onopen = function() { resolve(); };
+    ws.onerror = function() { reject(new Error('Connection failed')); };
+    ws.onclose = function() {
+      if (isMultiplayer && raceState === 'racing') {
+        // Disconnected during race
+        isMultiplayer = false;
+        document.getElementById('mp-error').textContent = 'Disconnected from server';
+      }
+      ws = null;
+    };
+    ws.onmessage = function(event) {
+      var msg;
+      try { msg = JSON.parse(event.data); } catch(e) { return; }
+      mpHandleMessage(msg);
+    };
+  });
+}
+
+function mpHandleMessage(msg) {
+  switch (msg.type) {
+    case 'room_created':
+      myPlayerId = msg.you;
+      mpRoomCode = msg.roomCode;
+      mpIsHost = true;
+      mpPlayers = msg.players;
+      document.getElementById('mp-room-code-display').textContent = msg.roomCode;
+      mpShowWaiting();
+      mpUpdatePlayerList();
+      break;
+
+    case 'room_joined':
+      myPlayerId = msg.you;
+      mpRoomCode = msg.roomCode;
+      mpIsHost = false;
+      mpPlayers = msg.players;
+      selectedTrackLength = msg.trackLength || 'medium';
+      document.getElementById('mp-room-code-display').textContent = msg.roomCode;
+      mpShowWaiting();
+      mpUpdatePlayerList();
+      break;
+
+    case 'player_joined':
+      mpPlayers = msg.players;
+      mpUpdatePlayerList();
+      break;
+
+    case 'player_update':
+      mpPlayers = msg.players;
+      mpUpdatePlayerList();
+      break;
+
+    case 'player_left':
+      mpPlayers = msg.players;
+      mpUpdatePlayerList();
+      break;
+
+    case 'error':
+      document.getElementById('mp-error').textContent = msg.message;
+      break;
+
+    case 'game_starting':
+      mpStartMultiplayerRace(msg);
+      break;
+
+    case 'countdown':
+      mpShowCountdown(msg.value);
+      break;
+
+    case 'race_start':
+      raceState = 'racing';
+      initAudio();
+      var cdOverlay = document.getElementById('mp-countdown-overlay');
+      cdOverlay.textContent = 'GO!';
+      setTimeout(function() { cdOverlay.style.display = 'none'; }, 600);
+      break;
+
+    case 'state':
+      mpHandleStateUpdate(msg.players);
+      break;
+  }
+}
+
+// ---- Multiplayer Actions ----
+
+function mpCreateRoom() {
+  var nameInput = document.getElementById('mp-create-name');
+  var username = (nameInput.value.trim() || 'Player').substring(0, 12);
+  document.getElementById('mp-error').textContent = '';
+  document.getElementById('mp-create-btn').disabled = true;
+
+  connectToServer(MP_SERVER_URL).then(function() {
+    ws.send(JSON.stringify({
+      type: 'create_room',
+      username: username,
+      color: mpSelectedColor,
+      trackLength: mpSelectedTrack
+    }));
+    selectedTrackLength = mpSelectedTrack;
+    document.getElementById('mp-create-btn').disabled = false;
+  }).catch(function(err) {
+    document.getElementById('mp-error').textContent = 'Could not connect to server';
+    document.getElementById('mp-create-btn').disabled = false;
+  });
+}
+
+function mpJoinRoom() {
+  var nameInput = document.getElementById('mp-join-name');
+  var codeInput = document.getElementById('mp-join-code');
+  var username = (nameInput.value.trim() || 'Player').substring(0, 12);
+  var code = codeInput.value.trim().toUpperCase();
+  if (code.length !== 4) {
+    document.getElementById('mp-error').textContent = 'Enter a 4-character room code';
+    return;
+  }
+  document.getElementById('mp-error').textContent = '';
+  document.getElementById('mp-join-btn').disabled = true;
+
+  connectToServer(MP_SERVER_URL).then(function() {
+    ws.send(JSON.stringify({
+      type: 'join_room',
+      roomCode: code,
+      username: username,
+      color: mpSelectedColor
+    }));
+    document.getElementById('mp-join-btn').disabled = false;
+  }).catch(function(err) {
+    document.getElementById('mp-error').textContent = 'Could not connect to server';
+    document.getElementById('mp-join-btn').disabled = false;
+  });
+}
+
+function mpStartGame() {
+  if (!ws || !mpIsHost) return;
+  ws.send(JSON.stringify({ type: 'start_game' }));
+}
+
+function mpGoBack() {
+  if (ws) { ws.close(); ws = null; }
+  isMultiplayer = false;
+  myPlayerId = null;
+  mpPlayers = [];
+  mpRoomCode = null;
+  mpIsHost = false;
+  mpLobbyState = 'pick';
+  // Restore tab display
+  var tabs = document.querySelectorAll('.mp-tab');
+  for (var i = 0; i < tabs.length; i++) tabs[i].style.display = '';
+  showMainMenu();
+}
+
+// ---- Start Multiplayer Race ----
+
+function mpStartMultiplayerRace(msg) {
+  isMultiplayer = true;
+  document.getElementById('mp-lobby').style.display = 'none';
+  document.getElementById('ui').style.display = 'block';
+  document.getElementById('lap-info').style.display = 'block';
+
+  // Generate track from seed
+  selectedTrackLength = msg.trackLength || selectedTrackLength;
+  var rng = createRNG(msg.seed);
+  var preset = TRACK_PRESETS[selectedTrackLength] || TRACK_PRESETS.medium;
+  var trackRadius = preset.baseRadiusMin + rng() * (preset.baseRadiusMax - preset.baseRadiusMin);
+  track = generateTrack(trackRadius, preset.numPoints, rng);
+
+  racers = [];
+  finishOrder = [];
+  mpRemotePlayers = {};
+
+  var allPlayers = msg.players; // [{id, username, color, isAI}]
+  mpTotalRacers = allPlayers.length;
+
+  // Grid positions - use seeded rng for deterministic order
+  var gridOrder = [];
+  for (var gi = 0; gi < allPlayers.length; gi++) gridOrder.push(gi);
+  for (var gi2 = gridOrder.length - 1; gi2 > 0; gi2--) {
+    var gj = Math.floor(rng() * (gi2 + 1));
+    var tmp = gridOrder[gi2]; gridOrder[gi2] = gridOrder[gj]; gridOrder[gj] = tmp;
+  }
+
+  player = null;
+  for (var pi = 0; pi < allPlayers.length; pi++) {
+    var pInfo = allPlayers[pi];
+    var gridPos = gridOrder[pi];
+    var startIdx = track.centerline.length - (gridPos * 3 + 3);
+    startIdx = ((startIdx % track.centerline.length) + track.centerline.length) % track.centerline.length;
+
+    var colorIdx = COLORS.indexOf(pInfo.color);
+    if (colorIdx === -1) colorIdx = pi;
+    var racer = createRacer(pi, startIdx, colorIdx, rng);
+    racer.name = pInfo.username;
+    racer.mpId = pInfo.id; // server-assigned player id
+    racer._isRemoteHuman = false;
+    racer._isAI = !!pInfo.isAI;
+
+    var n = track.normals[startIdx];
+    var offset = (gridPos % 2 === 0 ? 1 : -1) * (10 + (gridPos % 3) * 8);
+    racer.x += n.x * offset;
+    racer.y += n.y * offset;
+
+    if (pInfo.id === myPlayerId) {
+      // This is us - the local player
+      player = racer;
+      racer._isRemoteHuman = false;
+    } else if (!pInfo.isAI) {
+      // Remote human player
+      racer._isRemoteHuman = true;
+      mpRemotePlayers[pInfo.id] = { targetX: racer.x, targetY: racer.y, targetAngle: racer.angle, targetSpeed: racer.speed };
+      racers.push(racer);
+    } else {
+      // AI bot - runs locally
+      racer._isRemoteHuman = false;
+      racers.push(racer);
+    }
+  }
+
+  // Initialize totalProgress
+  var allInit = [player].concat(racers).filter(Boolean);
+  var cl = track.centerline.length;
+  for (var ti = 0; ti < allInit.length; ti++) {
+    allInit[ti].totalProgress = -(cl - allInit[ti].progress);
+  }
+
+  if (player) {
+    camera.x = player.x;
+    camera.y = player.y;
+  }
+
+  raceState = 'countdown';
+  var cdOverlay = document.getElementById('mp-countdown-overlay');
+  cdOverlay.style.display = 'block';
+  cdOverlay.textContent = '';
+}
+
+function mpShowCountdown(value) {
+  var cdOverlay = document.getElementById('mp-countdown-overlay');
+  cdOverlay.style.display = 'block';
+  cdOverlay.textContent = value > 0 ? value : 'GO!';
+}
+
+// ---- Network: Send Input ----
+
+function mpSendInput() {
+  if (!ws || ws.readyState !== 1 || !player) return;
+  // Throttle sending to ~20Hz (every 50ms)
+  var now = performance.now();
+  if (now - mpSendTimer < 45) return;
+  mpSendTimer = now;
+
+  var steering = 0, throttle = 0, brake = 0;
+  if (keys['ArrowLeft'] || keys['a'] || keys['A']) steering = -1;
+  else if (keys['ArrowRight'] || keys['d'] || keys['D']) steering = 1;
+  if (keys['ArrowUp'] || keys['w'] || keys['W']) throttle = 1;
+  if (keys['ArrowDown'] || keys['s'] || keys['S']) brake = 1;
+
+  ws.send(JSON.stringify({
+    type: 'input',
+    steering: steering,
+    throttle: throttle,
+    brake: brake,
+    x: player.x,
+    y: player.y,
+    angle: player.angle,
+    speed: player.speed,
+    lap: player.lap,
+    progress: player.progress
+  }));
+}
+
+// ---- Network: Handle State Updates ----
+
+function mpHandleStateUpdate(remotePlayers) {
+  if (!racers || !track) return;
+  for (var si = 0; si < remotePlayers.length; si++) {
+    var rp = remotePlayers[si];
+    if (rp.id === myPlayerId) continue; // Skip our own data
+
+    // Find the matching racer
+    for (var ri = 0; ri < racers.length; ri++) {
+      if (racers[ri].mpId === rp.id && racers[ri]._isRemoteHuman) {
+        var target = mpRemotePlayers[rp.id];
+        if (target) {
+          target.targetX = rp.x;
+          target.targetY = rp.y;
+          target.targetAngle = rp.angle;
+          target.targetSpeed = rp.speed;
+        }
+        // Update lap/progress directly
+        if (rp.lap !== undefined) racers[ri].lap = rp.lap;
+        break;
+      }
+    }
+  }
+}
+
+// ---- Network: Interpolate Remote Players ----
+
+function mpInterpolateRemote(r, dt) {
+  var target = mpRemotePlayers[r.mpId];
+  if (!target) return;
+  var lerpRate = 0.2;
+  r.x += (target.targetX - r.x) * lerpRate;
+  r.y += (target.targetY - r.y) * lerpRate;
+
+  // Angle interpolation (handle wrapping)
+  var angleDiff = target.targetAngle - r.angle;
+  while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+  while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+  r.angle += angleDiff * lerpRate;
+
+  r.speed += (target.targetSpeed - r.speed) * lerpRate;
+
+  // Move car forward based on interpolated speed
+  r.x += Math.cos(r.angle) * r.speed * 0.1;
+  r.y += Math.sin(r.angle) * r.speed * 0.1;
+}
+
+// ---- Multiplayer Reset ----
+
+function resetRaceMP() {
+  if (ws) { ws.close(); ws = null; }
+  isMultiplayer = false;
+  myPlayerId = null;
+  mpPlayers = [];
+  mpRemotePlayers = {};
+  mpRoomCode = null;
+  mpIsHost = false;
+  mpTotalRacers = TOTAL_RACERS;
 }
 
 // Catch runtime errors
