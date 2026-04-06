@@ -34,7 +34,10 @@ function createRoom(ws, username, color, trackLength) {
     seed: 0,
     tickInterval: null,
     raceStartTime: 0,
-    createdAt: Date.now()
+    createdAt: Date.now(),
+    tracks: [],        // array of { playerId, username, points: [{x,y}] }
+    currentRound: 0,
+    totalRounds: 0
   };
 
   rooms.set(code, room);

@@ -79,11 +79,54 @@ wss.on('connection', (ws) => {
         break;
       }
 
+      case 'submit_track': {
+        const room = getRoom(ws.roomCode);
+        if (!room || room.state !== 'lobby') return;
+        // Remove any existing track from this player
+        room.tracks = room.tracks.filter(t => t.playerId !== ws.playerId);
+        const p = room.players.find(p => p.id === ws.playerId);
+        if (msg.points && Array.isArray(msg.points) && msg.points.length >= 10) {
+          room.tracks.push({ playerId: ws.playerId, username: msg.username || 'Unknown', points: msg.points });
+          if (p) p.hasTrack = true;
+        } else {
+          if (p) p.hasTrack = false;
+        }
+        // Broadcast player update and track list
+        broadcastToRoom(room, {
+          type: 'player_update',
+          players: room.players.filter(pp => !pp.isAI).map(serializePlayer)
+        });
+        broadcastToRoom(room, {
+          type: 'tracks_update',
+          tracks: room.tracks.map(t => ({ playerId: t.playerId, username: t.username }))
+        });
+        break;
+      }
+
       case 'start_game': {
         const room = getRoom(ws.roomCode);
         if (!room || room.hostId !== ws.playerId) return;
         if (room.state !== 'lobby') return;
         startGame(room);
+        break;
+      }
+
+      case 'round_finished': {
+        const room = getRoom(ws.roomCode);
+        if (!room || room.hostId !== ws.playerId) return;
+        // Host reports round results
+        if (msg.results && Array.isArray(msg.results)) {
+          if (!room.roundResults) room.roundResults = [];
+          room.roundResults.push(msg.results);
+        }
+        // Advance to next round
+        room.currentRound++;
+        if (room.currentRound < room.totalRounds) {
+          startRound(room);
+        } else {
+          room.state = 'finished';
+          broadcastToRoom(room, { type: 'all_rounds_finished', roundResults: room.roundResults });
+        }
         break;
       }
 
@@ -122,7 +165,7 @@ wss.on('connection', (ws) => {
 });
 
 function serializePlayer(p) {
-  return { id: p.id, username: p.username, color: p.color, ready: p.ready, isHost: p.isHost };
+  return { id: p.id, username: p.username, color: p.color, ready: p.ready, isHost: p.isHost, hasTrack: !!p.hasTrack };
 }
 
 function broadcastToRoom(room, msg, excludeWs) {
@@ -135,8 +178,14 @@ function broadcastToRoom(room, msg, excludeWs) {
 }
 
 function startGame(room) {
-  room.state = 'countdown';
-  room.seed = (Math.random() * 2 ** 32) | 0;
+  // Determine rounds: one per player-drawn track, or 1 random if none
+  if (room.tracks.length > 0) {
+    room.totalRounds = room.tracks.length;
+  } else {
+    room.totalRounds = 1;
+  }
+  room.currentRound = 0;
+  room.roundResults = [];
 
   // Fill remaining slots with AI
   const aiColors = ['#3399ff', '#ff4444', '#bbbbbb', '#44ff44', '#cc44ff', '#ffaa00'];
@@ -156,37 +205,69 @@ function startGame(room) {
       isAI: true,
       ws: null,
       input: { steering: 0, throttle: 0, brake: 0 },
-      // AI state will be initialized by clients
       x: 0, y: 0, angle: 0, speed: 0, lap: 0, progress: 0, totalProgress: 0
     });
   }
 
-  const startMsg = {
-    type: 'game_starting',
-    seed: room.seed,
-    trackLength: room.trackLength,
-    players: room.players.map(p => ({
-      id: p.id,
-      username: p.username,
-      color: p.color,
-      isAI: !!p.isAI
-    }))
-  };
+  startRound(room);
+}
 
-  broadcastToRoom(room, startMsg);
+function startRound(room) {
+  room.state = 'countdown';
+  room.seed = (Math.random() * 2 ** 32) | 0;
 
-  // Countdown
-  let count = 3;
-  const countdownInterval = setInterval(() => {
-    broadcastToRoom(room, { type: 'countdown', value: count });
-    count--;
-    if (count < 0) {
-      clearInterval(countdownInterval);
-      room.state = 'racing';
-      broadcastToRoom(room, { type: 'race_start' });
-      startGameLoop(room);
-    }
-  }, 800);
+  // Reset player positions for new round
+  for (const p of room.players) {
+    p.x = 0; p.y = 0; p.angle = 0; p.speed = 0; p.lap = 0; p.progress = 0; p.totalProgress = 0;
+  }
+
+  // Build round info
+  const roundTrack = room.tracks.length > 0 ? room.tracks[room.currentRound] : null;
+
+  // Send round_info first if multi-round
+  if (room.totalRounds > 1) {
+    broadcastToRoom(room, {
+      type: 'round_info',
+      currentRound: room.currentRound,
+      totalRounds: room.totalRounds,
+      trackAuthor: roundTrack ? roundTrack.username : null
+    });
+  }
+
+  const delay = room.totalRounds > 1 ? 3000 : 0;
+
+  setTimeout(() => {
+    const startMsg = {
+      type: 'game_starting',
+      seed: room.seed,
+      trackLength: room.trackLength,
+      currentRound: room.currentRound,
+      totalRounds: room.totalRounds,
+      trackPoints: roundTrack ? roundTrack.points : null,
+      trackAuthor: roundTrack ? roundTrack.username : null,
+      players: room.players.map(p => ({
+        id: p.id,
+        username: p.username,
+        color: p.color,
+        isAI: !!p.isAI
+      }))
+    };
+
+    broadcastToRoom(room, startMsg);
+
+    // Countdown
+    let count = 3;
+    const countdownInterval = setInterval(() => {
+      broadcastToRoom(room, { type: 'countdown', value: count });
+      count--;
+      if (count < 0) {
+        clearInterval(countdownInterval);
+        room.state = 'racing';
+        broadcastToRoom(room, { type: 'race_start' });
+        startGameLoop(room);
+      }
+    }, 800);
+  }, delay);
 }
 
 function startGameLoop(room) {

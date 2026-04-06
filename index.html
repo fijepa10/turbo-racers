@@ -163,6 +163,53 @@ button:hover { transform: scale(1.05); }
   position: absolute; font-size: 120px; font-weight: bold; color: #ffd700;
   text-shadow: 0 0 40px rgba(255,215,0,0.6); z-index: 15; display: none;
 }
+.mp-player-track-icon { color: #44cc44; font-size: 13px; margin-left: auto; }
+.mp-draw-btn {
+  padding: 10px 24px; font-size: 15px; letter-spacing: 1px; background: #2a2a5a; color: #aaf; border: 2px solid #55a; border-radius: 6px; cursor: pointer; transition: all 0.15s;
+}
+.mp-draw-btn:hover { background: #3a3a7a; border-color: #88f; }
+
+/* ---- Track Editor ---- */
+#track-editor {
+  position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 20; display: none;
+  flex-direction: column; align-items: center; justify-content: center;
+}
+#track-editor-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+#track-editor-ui {
+  position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1;
+}
+#te-top-bar {
+  pointer-events: auto; display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 24px; background: rgba(0,0,0,0.7);
+}
+#te-top-bar h3 { color: #ffd700; font-size: 20px; letter-spacing: 2px; margin: 0; }
+#te-instructions { color: #aaa; font-size: 13px; }
+#te-point-count { color: #888; font-size: 12px; }
+#te-buttons { display: flex; gap: 10px; }
+#te-buttons button {
+  pointer-events: auto; padding: 8px 24px; font-size: 15px; font-weight: bold; border-radius: 6px; cursor: pointer; border: none; transition: all 0.15s;
+}
+#te-clear-btn { background: #aa3333; color: #fff; }
+#te-clear-btn:hover { background: #cc4444; }
+#te-done-btn { background: #44cc44; color: #111; }
+#te-done-btn:hover { background: #55dd55; }
+#te-done-btn:disabled { background: #336633; color: #666; cursor: not-allowed; }
+
+/* ---- Round Info Overlay ---- */
+#round-info-overlay {
+  position: absolute; display: none; flex-direction: column; align-items: center; justify-content: center;
+  top: 0; left: 0; width: 100%; height: 100%; z-index: 18; background: rgba(0,0,0,0.85);
+}
+#round-info-overlay h2 { font-size: 48px; color: #ffd700; font-family: 'LedLight', sans-serif; margin-bottom: 8px; }
+#round-info-overlay p { font-size: 22px; color: #ccc; }
+
+/* ---- Final Standings ---- */
+#final-standings {
+  position: absolute; display: none; flex-direction: column; align-items: center; gap: 16px;
+  background: rgba(0,0,0,0.9); padding: 40px 48px; border-radius: 16px; z-index: 20;
+}
+#final-standings h2 { font-size: 36px; color: #ffd700; font-family: 'LedLight', sans-serif; }
+#final-standings-results { font-size: 18px; line-height: 2; }
 </style>
 </head>
 <body>
@@ -260,10 +307,43 @@ button:hover { transform: scale(1.05); }
     <div class="mp-room-code" id="mp-room-code-display"></div>
     <div class="mp-player-list" id="mp-player-list"></div>
     <div class="mp-status" id="mp-waiting-status">Waiting for players...</div>
+    <button class="mp-draw-btn" id="mp-draw-track-btn" onclick="teOpen()">DRAW TRACK</button>
     <button class="mp-btn start-race" id="mp-start-btn" onclick="mpStartGame()" style="display:none" disabled>START RACE</button>
   </div>
 
   <button class="mp-back-btn" onclick="mpGoBack()">BACK</button>
+</div>
+
+<!-- Track Editor -->
+<div id="track-editor">
+  <canvas id="track-editor-canvas"></canvas>
+  <div id="track-editor-ui">
+    <div id="te-top-bar">
+      <div>
+        <h3>TRACK EDITOR</h3>
+        <div id="te-instructions">Click to place points. Close the loop to finish.</div>
+        <div id="te-point-count">Points: 0</div>
+      </div>
+      <div id="te-buttons">
+        <button id="te-clear-btn" onclick="teClear()">CLEAR</button>
+        <button id="te-done-btn" onclick="teDone()" disabled>DONE</button>
+        <button id="te-cancel-btn" style="background:#666;color:#fff" onclick="teCancel()">CANCEL</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Round Info Overlay -->
+<div id="round-info-overlay">
+  <h2 id="round-info-title">Round 1/3</h2>
+  <p id="round-info-author"></p>
+</div>
+
+<!-- Final Standings -->
+<div id="final-standings">
+  <h2>FINAL STANDINGS</h2>
+  <div id="final-standings-results"></div>
+  <button onclick="finalStandingsDone()">BACK TO MENU</button>
 </div>
 
 <div id="mp-countdown-overlay"></div>
@@ -362,6 +442,9 @@ function showMainMenu() {
   document.getElementById('mp-lobby').style.display = 'none';
   document.getElementById('ui').style.display = 'none';
   document.getElementById('lap-info').style.display = 'none';
+  document.getElementById('track-editor').style.display = 'none';
+  document.getElementById('round-info-overlay').style.display = 'none';
+  document.getElementById('final-standings').style.display = 'none';
 }
 
 function selectTrackLength(len, btn) {
@@ -2474,6 +2557,626 @@ function resetRaceMP() {
   mpIsHost = false;
   mpTotalRacers = TOTAL_RACERS;
 }
+
+// ---- Track Editor ----
+var tePoints = [];
+var teClosed = false;
+var tePanX = 0, tePanY = 0, teZoom = 1;
+var teDragging = false, teDragStartX = 0, teDragStartY = 0, tePanStartX = 0, tePanStartY = 0;
+var teDragMoved = false;
+var teCanvas = null, teCtx = null;
+var teAnimFrame = null;
+var teMyTrackPoints = null; // saved points from editor
+
+function teOpen() {
+  tePoints = [];
+  teClosed = false;
+  tePanX = 0; tePanY = 0; teZoom = 1;
+  teMyTrackPoints = null;
+  teCanvas = document.getElementById('track-editor-canvas');
+  teCanvas.width = window.innerWidth;
+  teCanvas.height = window.innerHeight;
+  teCtx = teCanvas.getContext('2d');
+  // Center pan so 0,0 is in the middle
+  tePanX = -teCanvas.width / 2;
+  tePanY = -teCanvas.height / 2;
+
+  document.getElementById('track-editor').style.display = 'flex';
+  document.getElementById('te-done-btn').disabled = true;
+  document.getElementById('te-point-count').textContent = 'Points: 0';
+  document.getElementById('te-instructions').textContent = 'Click to place points. Close the loop to finish.';
+
+  teCanvas.addEventListener('mousedown', teMouseDown);
+  teCanvas.addEventListener('mousemove', teMouseMove);
+  teCanvas.addEventListener('mouseup', teMouseUp);
+  teCanvas.addEventListener('wheel', teWheel);
+  window.addEventListener('resize', teResize);
+
+  teDraw();
+}
+
+function teResize() {
+  if (!teCanvas) return;
+  teCanvas.width = window.innerWidth;
+  teCanvas.height = window.innerHeight;
+  teDraw();
+}
+
+function teScreenToWorld(sx, sy) {
+  return { x: (sx / teZoom) + tePanX, y: (sy / teZoom) + tePanY };
+}
+
+function teWorldToScreen(wx, wy) {
+  return { x: (wx - tePanX) * teZoom, y: (wy - tePanY) * teZoom };
+}
+
+function teMouseDown(e) {
+  teDragStartX = e.clientX;
+  teDragStartY = e.clientY;
+  tePanStartX = tePanX;
+  tePanStartY = tePanY;
+  teDragging = true;
+  teDragMoved = false;
+}
+
+function teMouseMove(e) {
+  if (!teDragging) return;
+  var dx = e.clientX - teDragStartX;
+  var dy = e.clientY - teDragStartY;
+  if (Math.abs(dx) + Math.abs(dy) > 5) teDragMoved = true;
+  if (teDragMoved) {
+    tePanX = tePanStartX - dx / teZoom;
+    tePanY = tePanStartY - dy / teZoom;
+    teDraw();
+  }
+}
+
+function teMouseUp(e) {
+  if (!teDragMoved && !teClosed) {
+    // This is a click - place a point
+    var wp = teScreenToWorld(e.clientX, e.clientY);
+    // Check if clicking near first point to close loop
+    if (tePoints.length >= 10) {
+      var fp = tePoints[0];
+      var fd = Math.sqrt((wp.x - fp.x) * (wp.x - fp.x) + (wp.y - fp.y) * (wp.y - fp.y));
+      if (fd < 30 / teZoom) {
+        teClosed = true;
+        document.getElementById('te-done-btn').disabled = false;
+        document.getElementById('te-instructions').textContent = 'Loop closed! Click DONE or keep editing.';
+        teDraw();
+        teDragging = false;
+        teDragMoved = false;
+        return;
+      }
+    }
+    tePoints.push({ x: wp.x, y: wp.y });
+    document.getElementById('te-point-count').textContent = 'Points: ' + tePoints.length;
+    if (tePoints.length < 10) {
+      document.getElementById('te-instructions').textContent = 'Click to place points. Need at least 10. (' + tePoints.length + '/10)';
+    } else if (!teClosed) {
+      document.getElementById('te-instructions').textContent = 'Click near the first point (green) to close the loop.';
+    }
+    teDraw();
+  }
+  teDragging = false;
+  teDragMoved = false;
+}
+
+function teWheel(e) {
+  e.preventDefault();
+  var oldZoom = teZoom;
+  var factor = e.deltaY < 0 ? 1.1 : 0.9;
+  teZoom = Math.max(0.1, Math.min(10, teZoom * factor));
+  // Zoom toward mouse position
+  var mx = e.clientX, my = e.clientY;
+  tePanX += mx / oldZoom - mx / teZoom;
+  tePanY += my / oldZoom - my / teZoom;
+  teDraw();
+}
+
+function teDraw() {
+  if (!teCtx) return;
+  var c = teCtx;
+  var w = teCanvas.width, h = teCanvas.height;
+  c.fillStyle = '#1a1a1a';
+  c.fillRect(0, 0, w, h);
+
+  // Draw grid
+  c.save();
+  c.scale(teZoom, teZoom);
+  c.translate(-tePanX, -tePanY);
+
+  var gridSize = 100;
+  var startX = Math.floor(tePanX / gridSize) * gridSize;
+  var startY = Math.floor(tePanY / gridSize) * gridSize;
+  var endX = tePanX + w / teZoom;
+  var endY = tePanY + h / teZoom;
+  c.strokeStyle = 'rgba(255,255,255,0.05)';
+  c.lineWidth = 1 / teZoom;
+  for (var gx = startX; gx <= endX; gx += gridSize) {
+    c.beginPath(); c.moveTo(gx, startY); c.lineTo(gx, endY); c.stroke();
+  }
+  for (var gy = startY; gy <= endY; gy += gridSize) {
+    c.beginPath(); c.moveTo(startX, gy); c.lineTo(endX, gy); c.stroke();
+  }
+
+  // Draw lines between points
+  if (tePoints.length > 1) {
+    c.beginPath();
+    c.moveTo(tePoints[0].x, tePoints[0].y);
+    for (var i = 1; i < tePoints.length; i++) {
+      c.lineTo(tePoints[i].x, tePoints[i].y);
+    }
+    if (teClosed) c.closePath();
+    c.strokeStyle = '#ffd700';
+    c.lineWidth = 3 / teZoom;
+    c.stroke();
+  }
+
+  // Draw points
+  for (var j = 0; j < tePoints.length; j++) {
+    var p = tePoints[j];
+    var r = 5 / teZoom;
+    c.beginPath();
+    c.arc(p.x, p.y, r, 0, Math.PI * 2);
+    if (j === 0) {
+      c.fillStyle = '#44ff44'; // first point green
+      c.beginPath();
+      c.arc(p.x, p.y, r * 1.8, 0, Math.PI * 2);
+      c.fill();
+    } else {
+      c.fillStyle = '#ffd700';
+      c.fill();
+    }
+  }
+
+  // If have points and not closed, show snap radius around first point
+  if (tePoints.length >= 10 && !teClosed) {
+    var fp = tePoints[0];
+    c.beginPath();
+    c.arc(fp.x, fp.y, 30 / teZoom, 0, Math.PI * 2);
+    c.strokeStyle = 'rgba(68,255,68,0.4)';
+    c.lineWidth = 2 / teZoom;
+    c.setLineDash([4 / teZoom, 4 / teZoom]);
+    c.stroke();
+    c.setLineDash([]);
+  }
+
+  c.restore();
+}
+
+function teClear() {
+  tePoints = [];
+  teClosed = false;
+  document.getElementById('te-done-btn').disabled = true;
+  document.getElementById('te-point-count').textContent = 'Points: 0';
+  document.getElementById('te-instructions').textContent = 'Click to place points. Close the loop to finish.';
+  teDraw();
+}
+
+function teCancel() {
+  teCleanup();
+  document.getElementById('track-editor').style.display = 'none';
+  document.getElementById('mp-lobby').style.display = 'flex';
+}
+
+function teDone() {
+  if (!teClosed || tePoints.length < 10) return;
+  teMyTrackPoints = tePoints.slice();
+  teCleanup();
+  document.getElementById('track-editor').style.display = 'none';
+  document.getElementById('mp-lobby').style.display = 'flex';
+
+  // Send track data to server
+  if (ws && ws.readyState === 1) {
+    var nameEl = document.getElementById('mp-create-name');
+    if (!nameEl || !nameEl.value) nameEl = document.getElementById('mp-join-name');
+    var username = nameEl ? (nameEl.value.trim() || 'Player') : 'Player';
+    ws.send(JSON.stringify({
+      type: 'submit_track',
+      username: username,
+      points: teMyTrackPoints
+    }));
+  }
+
+  // Update draw button text
+  document.getElementById('mp-draw-track-btn').textContent = 'REDRAW TRACK';
+}
+
+function teCleanup() {
+  if (teCanvas) {
+    teCanvas.removeEventListener('mousedown', teMouseDown);
+    teCanvas.removeEventListener('mousemove', teMouseMove);
+    teCanvas.removeEventListener('mouseup', teMouseUp);
+    teCanvas.removeEventListener('wheel', teWheel);
+  }
+  window.removeEventListener('resize', teResize);
+  teCanvas = null;
+  teCtx = null;
+}
+
+// ---- Generate track from user-drawn points ----
+
+function generateTrackFromPoints(userPoints) {
+  // 1) Catmull-Rom spline to smooth user points into more points
+  var numDesired = 800;
+  var splined = catmullRomLoop(userPoints, numDesired);
+
+  // 2) Resample to evenly spaced points
+  var resampled = resampleLoop(splined, numDesired);
+
+  // 3) Smooth passes (same as generateTrack)
+  var centerline = resampled;
+  var minRadius = TRACK_WIDTH / 2 + 10;
+  for (var pass = 0; pass < 5; pass++) {
+    var smoothed = [];
+    for (var i = 0; i < centerline.length; i++) {
+      var prev = centerline[(i - 1 + centerline.length) % centerline.length];
+      var cur = centerline[i];
+      var next = centerline[(i + 1) % centerline.length];
+      var dx1 = cur.x - prev.x, dy1 = cur.y - prev.y;
+      var dx2 = next.x - cur.x, dy2 = next.y - cur.y;
+      var cross = Math.abs(dx1 * dy2 - dy1 * dx2);
+      var segLen = Math.sqrt(dx1 * dx1 + dy1 * dy1) || 1;
+      var localRadius = (segLen * segLen) / (cross + 0.001);
+      var blend = localRadius < minRadius ? 0.15 : 0.5;
+      smoothed.push({
+        x: cur.x * blend + (prev.x + next.x) * ((1 - blend) / 2),
+        y: cur.y * blend + (prev.y + next.y) * ((1 - blend) / 2)
+      });
+    }
+    centerline = smoothed;
+  }
+
+  // 4) Compute normals
+  var normals = [];
+  for (var ni = 0; ni < centerline.length; ni++) {
+    var nxt = centerline[(ni + 1) % centerline.length];
+    var prv = centerline[(ni - 1 + centerline.length) % centerline.length];
+    var dx = nxt.x - prv.x;
+    var dy = nxt.y - prv.y;
+    var len = Math.sqrt(dx * dx + dy * dy) || 1;
+    normals.push({ x: -dy / len, y: dx / len });
+  }
+
+  // 5) Cumulative distances
+  var distances = [0];
+  for (var di = 1; di < centerline.length; di++) {
+    var ddx = centerline[di].x - centerline[di - 1].x;
+    var ddy = centerline[di].y - centerline[di - 1].y;
+    distances.push(distances[di - 1] + Math.sqrt(ddx * ddx + ddy * ddy));
+  }
+  var totalLength = distances[distances.length - 1];
+
+  // 6) Build walls
+  var hw = TRACK_WIDTH / 2;
+  var innerWall = centerline.map(function(p, i) { return { x: p.x + normals[i].x * hw, y: p.y + normals[i].y * hw }; });
+  var outerWall = centerline.map(function(p, i) { return { x: p.x - normals[i].x * hw, y: p.y - normals[i].y * hw }; });
+
+  var innerSegments = [];
+  var outerSegments = [];
+  for (var si = 0; si < innerWall.length; si++) {
+    var sj = (si + 1) % innerWall.length;
+    innerSegments.push([innerWall[si], innerWall[sj]]);
+    outerSegments.push([outerWall[si], outerWall[sj]]);
+  }
+
+  return { centerline: centerline, normals: normals, distances: distances, totalLength: totalLength, innerWall: innerWall, outerWall: outerWall, innerSegments: innerSegments, outerSegments: outerSegments };
+}
+
+function catmullRomLoop(points, numOut) {
+  var n = points.length;
+  var result = [];
+  var perSeg = Math.ceil(numOut / n);
+  for (var i = 0; i < n; i++) {
+    var p0 = points[(i - 1 + n) % n];
+    var p1 = points[i];
+    var p2 = points[(i + 1) % n];
+    var p3 = points[(i + 2) % n];
+    for (var j = 0; j < perSeg; j++) {
+      var t = j / perSeg;
+      var t2 = t * t;
+      var t3 = t2 * t;
+      var x = 0.5 * ((2 * p1.x) + (-p0.x + p2.x) * t + (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * t2 + (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * t3);
+      var y = 0.5 * ((2 * p1.y) + (-p0.y + p2.y) * t + (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t2 + (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * t3);
+      result.push({ x: x, y: y });
+    }
+  }
+  return result;
+}
+
+function resampleLoop(points, numOut) {
+  // Compute total length
+  var n = points.length;
+  var dists = [0];
+  for (var i = 1; i < n; i++) {
+    var dx = points[i].x - points[i - 1].x;
+    var dy = points[i].y - points[i - 1].y;
+    dists.push(dists[i - 1] + Math.sqrt(dx * dx + dy * dy));
+  }
+  // Closing segment
+  var closeDx = points[0].x - points[n - 1].x;
+  var closeDy = points[0].y - points[n - 1].y;
+  var totalLen = dists[n - 1] + Math.sqrt(closeDx * closeDx + closeDy * closeDy);
+
+  var step = totalLen / numOut;
+  var result = [];
+  var pi2 = 0;
+  var accumDist = 0;
+  for (var oi = 0; oi < numOut; oi++) {
+    var targetDist = oi * step;
+    // Walk along the polyline to find the right segment
+    while (pi2 < n - 1 && dists[pi2 + 1] < targetDist) pi2++;
+    var segStart, segEnd, segStartDist, segLen;
+    if (pi2 < n - 1) {
+      segStart = points[pi2];
+      segEnd = points[pi2 + 1];
+      segStartDist = dists[pi2];
+      segLen = dists[pi2 + 1] - dists[pi2];
+    } else {
+      segStart = points[n - 1];
+      segEnd = points[0];
+      segStartDist = dists[n - 1];
+      segLen = totalLen - dists[n - 1];
+    }
+    var t = segLen > 0 ? (targetDist - segStartDist) / segLen : 0;
+    t = Math.max(0, Math.min(1, t));
+    result.push({ x: segStart.x + (segEnd.x - segStart.x) * t, y: segStart.y + (segEnd.y - segStart.y) * t });
+  }
+  return result;
+}
+
+// ---- Multi-Round System ----
+var mpCurrentRound = 0;
+var mpTotalRoundsCount = 1;
+var mpRoundScores = {}; // playerId -> total points
+var mpSubmittedTracks = []; // [{playerId, username}]
+var ROUND_POINTS = [10, 6, 4, 3, 2, 1];
+
+function mpHandleRoundInfo(msg) {
+  mpCurrentRound = msg.currentRound;
+  mpTotalRoundsCount = msg.totalRounds;
+  var overlay = document.getElementById('round-info-overlay');
+  var title = document.getElementById('round-info-title');
+  var author = document.getElementById('round-info-author');
+  title.textContent = 'Round ' + (msg.currentRound + 1) + '/' + msg.totalRounds;
+  author.textContent = msg.trackAuthor ? msg.trackAuthor + "'s Track" : 'Random Track';
+  overlay.style.display = 'flex';
+  // It will be hidden when game_starting arrives
+}
+
+function mpHandleAllRoundsFinished(msg) {
+  raceState = 'idle';
+  // Calculate final standings from all round results
+  var allScores = {};
+  if (msg.roundResults) {
+    for (var ri = 0; ri < msg.roundResults.length; ri++) {
+      var roundRes = msg.roundResults[ri];
+      for (var pi = 0; pi < roundRes.length; pi++) {
+        var pr = roundRes[pi];
+        if (!allScores[pr.name]) allScores[pr.name] = { name: pr.name, color: pr.color, points: 0 };
+        allScores[pr.name].points += ROUND_POINTS[pi] || 0;
+      }
+    }
+  }
+  var sorted = Object.values(allScores).sort(function(a, b) { return b.points - a.points; });
+
+  var resultsEl = document.getElementById('final-standings-results');
+  var html = '';
+  for (var si = 0; si < sorted.length; si++) {
+    var s = sorted[si];
+    var medal = si === 0 ? '&#x1F947;' : si === 1 ? '&#x1F948;' : si === 2 ? '&#x1F949;' : '&nbsp;&nbsp;&nbsp;';
+    html += '<div style="color:' + s.color + '">' + medal + ' ' + (si + 1) + '. ' + s.name + ' - ' + s.points + ' pts</div>';
+  }
+  resultsEl.innerHTML = html;
+
+  document.getElementById('finish-screen').style.display = 'none';
+  document.getElementById('ui').style.display = 'none';
+  document.getElementById('lap-info').style.display = 'none';
+  document.getElementById('final-standings').style.display = 'flex';
+}
+
+function finalStandingsDone() {
+  document.getElementById('final-standings').style.display = 'none';
+  if (isMultiplayer) resetRaceMP();
+  showMainMenu();
+}
+
+// Override mpUpdatePlayerList to show track icons
+var _origMpUpdatePlayerList = mpUpdatePlayerList;
+mpUpdatePlayerList = function() {
+  var list = document.getElementById('mp-player-list');
+  list.innerHTML = '';
+  for (var i = 0; i < mpPlayers.length; i++) {
+    var p = mpPlayers[i];
+    var entry = document.createElement('div');
+    entry.className = 'mp-player-entry';
+    var dot = document.createElement('div');
+    dot.className = 'mp-player-dot';
+    dot.style.background = p.color;
+    entry.appendChild(dot);
+    var name = document.createElement('span');
+    name.className = 'mp-player-name';
+    name.textContent = p.username;
+    entry.appendChild(name);
+    if (p.isHost) {
+      var tag = document.createElement('span');
+      tag.className = 'mp-player-tag';
+      tag.textContent = '(HOST)';
+      entry.appendChild(tag);
+    }
+    if (p.id === myPlayerId) {
+      var youTag = document.createElement('span');
+      youTag.className = 'mp-player-tag';
+      youTag.style.color = '#888';
+      youTag.textContent = '(YOU)';
+      entry.appendChild(youTag);
+    }
+    if (p.hasTrack) {
+      var trackIcon = document.createElement('span');
+      trackIcon.className = 'mp-player-track-icon';
+      trackIcon.textContent = '\u2714 Track';
+      entry.appendChild(trackIcon);
+    }
+    list.appendChild(entry);
+  }
+
+  // Update start button visibility
+  var startBtn = document.getElementById('mp-start-btn');
+  if (mpIsHost) {
+    startBtn.style.display = '';
+    startBtn.disabled = mpPlayers.length < 2;
+  } else {
+    startBtn.style.display = 'none';
+  }
+
+  var statusEl = document.getElementById('mp-waiting-status');
+  var trackCount = 0;
+  for (var tc = 0; tc < mpPlayers.length; tc++) { if (mpPlayers[tc].hasTrack) trackCount++; }
+  var trackInfo = trackCount > 0 ? ' | ' + trackCount + ' track(s) drawn' : '';
+  statusEl.textContent = mpPlayers.length + '/6 players' + trackInfo + (mpIsHost ? '' : ' - Waiting for host to start...');
+};
+
+// Override mpHandleMessage to add new message types
+var _origMpHandleMessage = mpHandleMessage;
+mpHandleMessage = function(msg) {
+  switch (msg.type) {
+    case 'round_info':
+      mpHandleRoundInfo(msg);
+      return;
+    case 'tracks_update':
+      mpSubmittedTracks = msg.tracks || [];
+      return;
+    case 'all_rounds_finished':
+      mpHandleAllRoundsFinished(msg);
+      return;
+    default:
+      _origMpHandleMessage(msg);
+  }
+};
+
+// Override mpStartMultiplayerRace to handle custom tracks and rounds
+var _origMpStartMultiplayerRace = mpStartMultiplayerRace;
+mpStartMultiplayerRace = function(msg) {
+  // Hide round info overlay if visible
+  document.getElementById('round-info-overlay').style.display = 'none';
+
+  isMultiplayer = true;
+  mpCurrentRound = msg.currentRound || 0;
+  mpTotalRoundsCount = msg.totalRounds || 1;
+
+  document.getElementById('mp-lobby').style.display = 'none';
+  document.getElementById('ui').style.display = 'block';
+  document.getElementById('lap-info').style.display = 'block';
+  document.getElementById('finish-screen').style.display = 'none';
+
+  // Generate track - either from custom points or from seed
+  selectedTrackLength = msg.trackLength || selectedTrackLength;
+  var rng = createRNG(msg.seed);
+
+  if (msg.trackPoints && msg.trackPoints.length >= 10) {
+    track = generateTrackFromPoints(msg.trackPoints);
+  } else {
+    var preset = TRACK_PRESETS[selectedTrackLength] || TRACK_PRESETS.medium;
+    var trackRadius = preset.baseRadiusMin + rng() * (preset.baseRadiusMax - preset.baseRadiusMin);
+    track = generateTrack(trackRadius, preset.numPoints, rng);
+  }
+
+  racers = [];
+  finishOrder = [];
+  mpRemotePlayers = {};
+
+  var allPlayers = msg.players;
+  mpTotalRacers = allPlayers.length;
+
+  var gridOrder = [];
+  for (var gi = 0; gi < allPlayers.length; gi++) gridOrder.push(gi);
+  for (var gi2 = gridOrder.length - 1; gi2 > 0; gi2--) {
+    var gj = Math.floor(rng() * (gi2 + 1));
+    var tmp = gridOrder[gi2]; gridOrder[gi2] = gridOrder[gj]; gridOrder[gj] = tmp;
+  }
+
+  player = null;
+  for (var pi = 0; pi < allPlayers.length; pi++) {
+    var pInfo = allPlayers[pi];
+    var gridPos = gridOrder[pi];
+    var startIdx = track.centerline.length - (gridPos * 3 + 3);
+    startIdx = ((startIdx % track.centerline.length) + track.centerline.length) % track.centerline.length;
+
+    var colorIdx = COLORS.indexOf(pInfo.color);
+    if (colorIdx === -1) colorIdx = pi;
+    var racer = createRacer(pi, startIdx, colorIdx, rng);
+    racer.name = pInfo.username;
+    racer.mpId = pInfo.id;
+    racer._isRemoteHuman = false;
+    racer._isAI = !!pInfo.isAI;
+
+    var n = track.normals[startIdx];
+    var offset = (gridPos % 2 === 0 ? 1 : -1) * (10 + (gridPos % 3) * 8);
+    racer.x += n.x * offset;
+    racer.y += n.y * offset;
+
+    if (pInfo.id === myPlayerId) {
+      player = racer;
+      racer._isRemoteHuman = false;
+    } else if (!pInfo.isAI) {
+      racer._isRemoteHuman = true;
+      mpRemotePlayers[pInfo.id] = { targetX: racer.x, targetY: racer.y, targetAngle: racer.angle, targetSpeed: racer.speed };
+      racers.push(racer);
+    } else {
+      racer._isRemoteHuman = false;
+      racers.push(racer);
+    }
+  }
+
+  var allInit = [player].concat(racers).filter(Boolean);
+  var cl = track.centerline.length;
+  for (var ti = 0; ti < allInit.length; ti++) {
+    allInit[ti].totalProgress = -(cl - allInit[ti].progress);
+  }
+
+  if (player) {
+    camera.x = player.x;
+    camera.y = player.y;
+  }
+
+  crate = null; crateDebris = []; crateRespawnTimer = 120;
+  raceState = 'countdown';
+  var cdOverlay = document.getElementById('mp-countdown-overlay');
+  cdOverlay.style.display = 'block';
+  cdOverlay.textContent = '';
+};
+
+// Override showFinish for multi-round multiplayer
+var _origShowFinish = showFinish;
+showFinish = function() {
+  if (isMultiplayer && mpTotalRoundsCount > 1) {
+    // Send round results to server (host only)
+    if (mpIsHost && ws && ws.readyState === 1) {
+      var results = finishOrder.map(function(r) { return { name: r.name, color: r.color, mpId: r.mpId }; });
+      ws.send(JSON.stringify({ type: 'round_finished', results: results }));
+    }
+    // Show brief finish results but server will trigger next round or final standings
+    var screen = document.getElementById('finish-screen');
+    var results = document.getElementById('finish-results');
+    var roundLabel = 'Round ' + (mpCurrentRound + 1) + '/' + mpTotalRoundsCount + ' Results';
+    results.innerHTML = '<div style="color:#ffd700;font-size:14px;margin-bottom:8px">' + roundLabel + '</div>' +
+      finishOrder.map(function(r, i) {
+        var medal = i === 0 ? '&#x1F947;' : i === 1 ? '&#x1F948;' : i === 2 ? '&#x1F949;' : '&nbsp;&nbsp;&nbsp;';
+        var pts = ROUND_POINTS[i] || 0;
+        return '<div style="color:' + r.color + '">' + medal + ' ' + (i + 1) + '. ' + r.name + ' (+' + pts + 'pts)</div>';
+      }).join('');
+    screen.querySelector('button').style.display = 'none'; // hide NEW RACE button during multi-round
+    screen.style.display = 'flex';
+    return;
+  }
+
+  // Single player or single-round MP - use original
+  _origShowFinish();
+  // Make sure the button is visible for single round
+  var screen = document.getElementById('finish-screen');
+  screen.querySelector('button').style.display = '';
+};
 
 // Catch runtime errors
 window.onerror = function(msg, url, line) { document.title = 'ERR L' + line + ': ' + msg; };
