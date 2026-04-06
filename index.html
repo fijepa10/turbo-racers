@@ -625,11 +625,15 @@ function startEngineLoop() {
 
 function updateEngineSound() {
   if (!engineSource || !player) return;
+  if (player.finished) {
+    // Fade out engine when finished
+    engineGain.gain.value = Math.max(0, engineGain.gain.value - 0.005);
+    engineSource.playbackRate.value = Math.max(0.3, engineSource.playbackRate.value - 0.002);
+    return;
+  }
   const effectiveMax = player.maxSpeed * getSpeedMultiplier(player);
-  const speedRatio = Math.max(0, player.speed / effectiveMax); // 0-1
-  // Playback rate: 0.4 at idle, 1.0 at max speed
+  const speedRatio = Math.max(0, player.speed / effectiveMax);
   engineSource.playbackRate.value = 0.4 + speedRatio * 0.6;
-  // Volume: quiet at low speed, full at high speed
   engineGain.gain.value = 0.15 + speedRatio * 0.55;
 }
 
@@ -1185,15 +1189,16 @@ function createRacer(id, startIdx, colorIdx, rng) {
 
 function updateRacer(r, dt, allRacers) {
   if (r.finished) {
-    r.speed *= 0.92;
-    if (r.speed < 0.5) r.speed = 0;
-    // Glide to a parked position on the track
-    const finishPos = finishOrder.indexOf(r);
-    const slot = (finishPos >= 0 ? finishPos : 0);
-    // Target: park along the track past the finish line, spaced out
+    // Stop boost effects
+    r.boostTimer = 0;
+    if (r.id === 0) { stopThrust(); stopScrape(); }
+
+    // Compute park target once
     if (!r._parkTarget) {
       const ci = closestCenterlineIndexNear(r.x, r.y, r.progress);
-      const parkIdx = (ci + 30 + slot * 15) % track.centerline.length;
+      const finishPos = finishOrder.indexOf(r);
+      const slot = (finishPos >= 0 ? finishPos : 0);
+      const parkIdx = (ci + 40 + slot * 20) % track.centerline.length;
       const pp = track.centerline[parkIdx];
       const pn = track.normals[parkIdx];
       const nextPt = track.centerline[(parkIdx + 3) % track.centerline.length];
@@ -1201,16 +1206,66 @@ function updateRacer(r, dt, allRacers) {
       r._parkTarget = {
         x: pp.x + pn.x * lateralOffset,
         y: pp.y + pn.y * lateralOffset,
-        angle: Math.atan2(nextPt.y - pp.y, nextPt.x - pp.x)
+        angle: Math.atan2(nextPt.y - pp.y, nextPt.x - pp.x),
+        idx: parkIdx
       };
+      r._parked = false;
     }
-    // Lerp toward park position
-    r.x += (r._parkTarget.x - r.x) * 0.05;
-    r.y += (r._parkTarget.y - r.y) * 0.05;
-    let aDiff = r._parkTarget.angle - r.angle;
-    while (aDiff > Math.PI) aDiff -= Math.PI * 2;
-    while (aDiff < -Math.PI) aDiff += Math.PI * 2;
-    r.angle += aDiff * 0.05;
+
+    // Check if parked
+    const distToPark = Math.sqrt((r.x - r._parkTarget.x) ** 2 + (r.y - r._parkTarget.y) ** 2);
+    if (distToPark < 5) {
+      r._parked = true;
+      r.speed = 0;
+      r.x = r._parkTarget.x;
+      r.y = r._parkTarget.y;
+      r.angle = r._parkTarget.angle;
+      return;
+    }
+    if (r._parked) return;
+
+    // Drive toward park spot following the centerline
+    r.speed *= 0.995;
+    r.speed = Math.max(1.5, Math.min(r.speed, 4));
+
+    // Steer toward park target via centerline
+    const ci = closestCenterlineIndexNear(r.x, r.y, r.progress);
+    const lookIdx = (ci + 15) % track.centerline.length;
+    const target = track.centerline[lookIdx];
+    const toT = Math.atan2(target.y - r.y, target.x - r.x);
+    let diff = toT - r.angle;
+    while (diff > Math.PI) diff -= Math.PI * 2;
+    while (diff < -Math.PI) diff += Math.PI * 2;
+    r.angle += diff * 0.12;
+    r.progress = ci;
+
+    // Avoid other finished cars
+    const allCarsRef = (typeof allRacers !== 'undefined') ? allRacers : racers;
+    for (const other of allCarsRef) {
+      if (other === r) continue;
+      const dx = other.x - r.x;
+      const dy = other.y - r.y;
+      const d = Math.sqrt(dx * dx + dy * dy);
+      if (d < CAR_LENGTH * 1.5 && d > 0.1) {
+        r.x -= (dx / d) * 1.5;
+        r.y -= (dy / d) * 1.5;
+      }
+    }
+
+    r.x += Math.cos(r.angle) * r.speed;
+    r.y += Math.sin(r.angle) * r.speed;
+
+    // Keep on track
+    const cp = track.centerline[ci];
+    const cn = track.normals[ci];
+    const toCar = { x: r.x - cp.x, y: r.y - cp.y };
+    const dotN = toCar.x * cn.x + toCar.y * cn.y;
+    const hw = TRACK_WIDTH / 2 - CAR_WIDTH;
+    if (Math.abs(dotN) > hw) {
+      const sign = dotN > 0 ? 1 : -1;
+      r.x = cp.x + cn.x * (hw - 2) * sign;
+      r.y = cp.y + cn.y * (hw - 2) * sign;
+    }
     return;
   }
 
@@ -1526,15 +1581,16 @@ function drawCar(r) {
 
 function updatePlayer(r, dt) {
   if (r.finished) {
-    r.speed *= 0.92;
-    if (r.speed < 0.5) r.speed = 0;
-    // Glide to a parked position on the track
-    const finishPos = finishOrder.indexOf(r);
-    const slot = (finishPos >= 0 ? finishPos : 0);
-    // Target: park along the track past the finish line, spaced out
+    // Stop boost effects
+    r.boostTimer = 0;
+    if (r.id === 0) { stopThrust(); stopScrape(); }
+
+    // Compute park target once
     if (!r._parkTarget) {
       const ci = closestCenterlineIndexNear(r.x, r.y, r.progress);
-      const parkIdx = (ci + 30 + slot * 15) % track.centerline.length;
+      const finishPos = finishOrder.indexOf(r);
+      const slot = (finishPos >= 0 ? finishPos : 0);
+      const parkIdx = (ci + 40 + slot * 20) % track.centerline.length;
       const pp = track.centerline[parkIdx];
       const pn = track.normals[parkIdx];
       const nextPt = track.centerline[(parkIdx + 3) % track.centerline.length];
@@ -1542,16 +1598,66 @@ function updatePlayer(r, dt) {
       r._parkTarget = {
         x: pp.x + pn.x * lateralOffset,
         y: pp.y + pn.y * lateralOffset,
-        angle: Math.atan2(nextPt.y - pp.y, nextPt.x - pp.x)
+        angle: Math.atan2(nextPt.y - pp.y, nextPt.x - pp.x),
+        idx: parkIdx
       };
+      r._parked = false;
     }
-    // Lerp toward park position
-    r.x += (r._parkTarget.x - r.x) * 0.05;
-    r.y += (r._parkTarget.y - r.y) * 0.05;
-    let aDiff = r._parkTarget.angle - r.angle;
-    while (aDiff > Math.PI) aDiff -= Math.PI * 2;
-    while (aDiff < -Math.PI) aDiff += Math.PI * 2;
-    r.angle += aDiff * 0.05;
+
+    // Check if parked
+    const distToPark = Math.sqrt((r.x - r._parkTarget.x) ** 2 + (r.y - r._parkTarget.y) ** 2);
+    if (distToPark < 5) {
+      r._parked = true;
+      r.speed = 0;
+      r.x = r._parkTarget.x;
+      r.y = r._parkTarget.y;
+      r.angle = r._parkTarget.angle;
+      return;
+    }
+    if (r._parked) return;
+
+    // Drive toward park spot following the centerline
+    r.speed *= 0.995;
+    r.speed = Math.max(1.5, Math.min(r.speed, 4));
+
+    // Steer toward park target via centerline
+    const ci = closestCenterlineIndexNear(r.x, r.y, r.progress);
+    const lookIdx = (ci + 15) % track.centerline.length;
+    const target = track.centerline[lookIdx];
+    const toT = Math.atan2(target.y - r.y, target.x - r.x);
+    let diff = toT - r.angle;
+    while (diff > Math.PI) diff -= Math.PI * 2;
+    while (diff < -Math.PI) diff += Math.PI * 2;
+    r.angle += diff * 0.12;
+    r.progress = ci;
+
+    // Avoid other finished cars
+    const allCarsRef = (typeof allRacers !== 'undefined') ? allRacers : racers;
+    for (const other of allCarsRef) {
+      if (other === r) continue;
+      const dx = other.x - r.x;
+      const dy = other.y - r.y;
+      const d = Math.sqrt(dx * dx + dy * dy);
+      if (d < CAR_LENGTH * 1.5 && d > 0.1) {
+        r.x -= (dx / d) * 1.5;
+        r.y -= (dy / d) * 1.5;
+      }
+    }
+
+    r.x += Math.cos(r.angle) * r.speed;
+    r.y += Math.sin(r.angle) * r.speed;
+
+    // Keep on track
+    const cp = track.centerline[ci];
+    const cn = track.normals[ci];
+    const toCar = { x: r.x - cp.x, y: r.y - cp.y };
+    const dotN = toCar.x * cn.x + toCar.y * cn.y;
+    const hw = TRACK_WIDTH / 2 - CAR_WIDTH;
+    if (Math.abs(dotN) > hw) {
+      const sign = dotN > 0 ? 1 : -1;
+      r.x = cp.x + cn.x * (hw - 2) * sign;
+      r.y = cp.y + cn.y * (hw - 2) * sign;
+    }
     return;
   }
 
