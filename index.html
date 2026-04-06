@@ -1619,7 +1619,9 @@ function updatePlayer(r, dt) {
 
 function updateCamera() {
   if (!player) return;
-  // NaN protection
+  // Debug to title
+  document.title = 'px:' + Math.round(player.x) + ' py:' + Math.round(player.y) + ' sp:' + player.speed.toFixed(1) + ' prog:' + player.progress + ' st:' + raceState;
+
   if (isNaN(player.x) || isNaN(player.y) || !isFinite(player.x) || !isFinite(player.y)) {
     player.x = track.centerline[0].x;
     player.y = track.centerline[0].y;
@@ -1810,6 +1812,7 @@ function drawSpeedometer() {
 
 let lastTime = 0;
 function gameLoop(time) {
+  try {
   const dt = Math.min(32, time - lastTime);
   lastTime = time;
 
@@ -1922,6 +1925,10 @@ function gameLoop(time) {
     updateUI();
   }
 
+  } catch(err) {
+    document.title = 'CRASH: ' + err.message;
+    console.error(err);
+  }
   requestAnimationFrame(gameLoop);
 }
 
