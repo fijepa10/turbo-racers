@@ -997,7 +997,57 @@ function generateTrack(trackBaseRadius, trackNumPoints, rng) {
     outerSegments.push([outerWall[i], outerWall[j]]);
   }
 
-  return { centerline, normals, distances, totalLength, innerWall, outerWall, innerSegments, outerSegments };
+  var result = { centerline, normals, distances, totalLength, innerWall, outerWall, innerSegments, outerSegments };
+  return rotateStartToStraight(result);
+}
+
+// Rotate track arrays so index 0 (start/finish line) is on the straightest section
+function rotateStartToStraight(trackData) {
+  var cl = trackData.centerline;
+  var len = cl.length;
+  var window = 30; // check curvature over this many points
+  var bestIdx = 0;
+  var bestCurvature = Infinity;
+  for (var i = 0; i < len; i += 10) {
+    // Sum of angle changes over the window
+    var totalCurve = 0;
+    for (var j = 0; j < window; j++) {
+      var a = (i + j) % len;
+      var b = (i + j + 1) % len;
+      var c = (i + j + 2) % len;
+      var dx1 = cl[b].x - cl[a].x, dy1 = cl[b].y - cl[a].y;
+      var dx2 = cl[c].x - cl[b].x, dy2 = cl[c].y - cl[b].y;
+      var cross = Math.abs(dx1 * dy2 - dy1 * dx2);
+      totalCurve += cross;
+    }
+    if (totalCurve < bestCurvature) {
+      bestCurvature = totalCurve;
+      bestIdx = i;
+    }
+  }
+  if (bestIdx === 0) return trackData;
+  // Rotate all arrays
+  function rotate(arr, n) { return arr.slice(n).concat(arr.slice(0, n)); }
+  trackData.centerline = rotate(trackData.centerline, bestIdx);
+  trackData.normals = rotate(trackData.normals, bestIdx);
+  trackData.innerWall = rotate(trackData.innerWall, bestIdx);
+  trackData.outerWall = rotate(trackData.outerWall, bestIdx);
+  // Rebuild segments and distances
+  trackData.innerSegments = [];
+  trackData.outerSegments = [];
+  for (var i = 0; i < trackData.innerWall.length; i++) {
+    var j = (i + 1) % trackData.innerWall.length;
+    trackData.innerSegments.push([trackData.innerWall[i], trackData.innerWall[j]]);
+    trackData.outerSegments.push([trackData.outerWall[i], trackData.outerWall[j]]);
+  }
+  trackData.distances = [0];
+  for (var i = 1; i < trackData.centerline.length; i++) {
+    var dx = trackData.centerline[i].x - trackData.centerline[i-1].x;
+    var dy = trackData.centerline[i].y - trackData.centerline[i-1].y;
+    trackData.distances.push(trackData.distances[i-1] + Math.sqrt(dx*dx + dy*dy));
+  }
+  trackData.totalLength = trackData.distances[trackData.distances.length - 1];
+  return trackData;
 }
 
 // ---- Segment intersection ----
@@ -2959,7 +3009,8 @@ function generateTrackFromPoints(userPoints) {
     outerSegments.push([outerWall[si], outerWall[sj]]);
   }
 
-  return { centerline: centerline, normals: normals, distances: distances, totalLength: totalLength, innerWall: innerWall, outerWall: outerWall, innerSegments: innerSegments, outerSegments: outerSegments };
+  var result = { centerline: centerline, normals: normals, distances: distances, totalLength: totalLength, innerWall: innerWall, outerWall: outerWall, innerSegments: innerSegments, outerSegments: outerSegments };
+  return rotateStartToStraight(result);
 }
 
 function catmullRomLoop(points, numOut) {
