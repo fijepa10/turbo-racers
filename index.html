@@ -441,7 +441,7 @@ function playCrash() {
   const gain = audioCtx.createGain();
   src.buffer = buf;
   src.playbackRate.value = 0.9 + Math.random() * 0.3;
-  gain.gain.value = 0.15;
+  gain.gain.value = 0.5;
   src.connect(gain);
   gain.connect(audioCtx.destination);
   src.start();
@@ -455,7 +455,7 @@ function startScrape() {
   scrapeSource.buffer = scrapeBuffer;
   scrapeSource.loop = true;
   scrapeSource.playbackRate.value = 2.0;
-  scrapeGain.gain.value = 0.6;
+  scrapeGain.gain.value = 0.9;
   scrapeSource.connect(scrapeGain);
   scrapeGain.connect(audioCtx.destination);
   scrapeSource.start();
