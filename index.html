@@ -1554,11 +1554,19 @@ function updatePlayer(r, dt) {
       const newVx = vx - cn.x * sign * intoWall;
       const newVy = vy - cn.y * sign * intoWall;
       const newSpeed = Math.sqrt(newVx * newVx + newVy * newVy);
-      if (newSpeed > 0.1) r.angle = Math.atan2(newVy, newVx);
-      r.speed = Math.max(r.maxSpeed * getSpeedMultiplier(r) * 0.3, newSpeed * 0.95);
+      if (!isNaN(newSpeed) && newSpeed > 0.1) r.angle = Math.atan2(newVy, newVx);
+      if (!isNaN(newSpeed)) r.speed = Math.max(r.maxSpeed * getSpeedMultiplier(r) * 0.3, newSpeed * 0.95);
     }
     addSparks(r.x, r.y, 3);
     shakeCamera(2);
+  }
+  // Safety: clamp position to sane range
+  if (isNaN(r.x) || isNaN(r.y) || isNaN(r.angle) || isNaN(r.speed)) {
+    const safeIdx = r.progress || 0;
+    r.x = track.centerline[safeIdx].x;
+    r.y = track.centerline[safeIdx].y;
+    r.speed = 0;
+    r.angle = 0;
   }
 
   // Car-car collision with push physics
@@ -1612,6 +1620,15 @@ function updatePlayer(r, dt) {
 
 function updateCamera() {
   if (!player) return;
+  // NaN protection - reset to track start if position corrupted
+  if (isNaN(player.x) || isNaN(player.y)) {
+    player.x = track.centerline[0].x;
+    player.y = track.centerline[0].y;
+    player.speed = 0;
+    camera.x = player.x;
+    camera.y = player.y;
+    return;
+  }
 
   const lookAhead = player.speed * 15;
   const targetX = player.x + Math.cos(player.angle) * lookAhead;
