@@ -250,6 +250,7 @@ button:hover { transform: scale(1.05); }
     <input type="text" class="username-input" id="username-input" maxlength="12" placeholder="Player" value="Player">
   </div>
 
+  <button id="draw-track-sp-btn" onclick="openTrackEditorSP()">DRAW YOUR OWN TRACK</button>
   <button id="start-race-btn" onclick="startRaceFromSetup()">START RACE</button>
   <button id="back-to-menu-btn" onclick="showMainMenu()">BACK</button>
 </div>
@@ -325,6 +326,7 @@ button:hover { transform: scale(1.05); }
         <div id="te-point-count">Points: 0</div>
       </div>
       <div id="te-buttons">
+        <button id="te-undo-btn" onclick="teUndo()" style="background:#555;color:#fff">UNDO</button>
         <button id="te-clear-btn" onclick="teClear()">CLEAR</button>
         <button id="te-done-btn" onclick="teDone()" disabled>DONE</button>
         <button id="te-cancel-btn" style="background:#666;color:#fff" onclick="teCancel()">CANCEL</button>
@@ -1956,12 +1958,16 @@ function showFinish() {
   screen.style.display = 'flex';
 }
 
-function initTrackAndRacers(rng) {
-  // Get track preset
-  const preset = TRACK_PRESETS[selectedTrackLength] || TRACK_PRESETS.medium;
-  const rand = rng || Math.random;
-  const trackRadius = preset.baseRadiusMin + rand() * (preset.baseRadiusMax - preset.baseRadiusMin);
-  track = generateTrack(trackRadius, preset.numPoints, rng);
+function initTrackAndRacers(rng, customTrackPoints) {
+  // Use custom track if provided, otherwise generate randomly
+  if (customTrackPoints && customTrackPoints.length >= 10) {
+    track = generateTrackFromPoints(customTrackPoints);
+  } else {
+    const preset = TRACK_PRESETS[selectedTrackLength] || TRACK_PRESETS.medium;
+    const rand = rng || Math.random;
+    const trackRadius = preset.baseRadiusMin + rand() * (preset.baseRadiusMax - preset.baseRadiusMin);
+    track = generateTrack(trackRadius, preset.numPoints, rng);
+  }
   racers = [];
   finishOrder = [];
 
@@ -2031,7 +2037,8 @@ function startRace(isAutoRestart) {
     testRaceCount = 0;
     testResults.length = 0;
   }
-  initTrackAndRacers();
+  initTrackAndRacers(null, spCustomTrackPoints);
+  spCustomTrackPoints = null; // clear after use
 
   // Countdown
   raceState = 'countdown';
@@ -2569,9 +2576,10 @@ var teAnimFrame = null;
 var teMyTrackPoints = null; // saved points from editor
 
 function teOpen() {
+  teFromSinglePlayer = false;
   tePoints = [];
   teClosed = false;
-  tePanX = 0; tePanY = 0; teZoom = 1;
+  tePanX = 0; tePanY = 0; teZoom = 0.4;
   teMyTrackPoints = null;
   teCanvas = document.getElementById('track-editor-canvas');
   teCanvas.width = window.innerWidth;
@@ -2647,6 +2655,26 @@ function teMouseUp(e) {
         teDragging = false;
         teDragMoved = false;
         return;
+      }
+    }
+    // Reject if turn angle would exceed 90 degrees
+    if (tePoints.length >= 2) {
+      var prev = tePoints[tePoints.length - 1];
+      var prev2 = tePoints[tePoints.length - 2];
+      var dx1 = prev.x - prev2.x, dy1 = prev.y - prev2.y;
+      var dx2 = wp.x - prev.x, dy2 = wp.y - prev.y;
+      var len1 = Math.sqrt(dx1 * dx1 + dy1 * dy1);
+      var len2 = Math.sqrt(dx2 * dx2 + dy2 * dy2);
+      if (len1 > 0 && len2 > 0) {
+        var dot = (dx1 * dx2 + dy1 * dy2) / (len1 * len2);
+        var angle = Math.acos(Math.max(-1, Math.min(1, dot)));
+        if (angle > Math.PI / 2) {
+          document.getElementById('te-instructions').textContent = 'Turn too sharp! Max 90 degrees.';
+          teDraw();
+          teDragging = false;
+          teDragMoved = false;
+          return;
+        }
       }
     }
     tePoints.push({ x: wp.x, y: wp.y });
@@ -2745,6 +2773,23 @@ function teDraw() {
   c.restore();
 }
 
+var teFromSinglePlayer = false;
+var spCustomTrackPoints = null;
+
+function teUndo() {
+  if (tePoints.length === 0) return;
+  tePoints.pop();
+  teClosed = false;
+  document.getElementById('te-done-btn').disabled = true;
+  document.getElementById('te-point-count').textContent = 'Points: ' + tePoints.length;
+  if (tePoints.length < 10) {
+    document.getElementById('te-instructions').textContent = 'Click to place points. Need at least 10. (' + tePoints.length + '/10)';
+  } else {
+    document.getElementById('te-instructions').textContent = 'Click near the first point (green) to close the loop.';
+  }
+  teDraw();
+}
+
 function teClear() {
   tePoints = [];
   teClosed = false;
@@ -2757,30 +2802,56 @@ function teClear() {
 function teCancel() {
   teCleanup();
   document.getElementById('track-editor').style.display = 'none';
-  document.getElementById('mp-lobby').style.display = 'flex';
+  if (teFromSinglePlayer) {
+    document.getElementById('setup-screen').style.display = 'flex';
+  } else {
+    document.getElementById('mp-lobby').style.display = 'flex';
+  }
 }
 
 function teDone() {
   if (!teClosed || tePoints.length < 10) return;
+  var perimeter = 0;
+  for (var i = 0; i < tePoints.length; i++) {
+    var next = tePoints[(i + 1) % tePoints.length];
+    var dx = next.x - tePoints[i].x;
+    var dy = next.y - tePoints[i].y;
+    perimeter += Math.sqrt(dx * dx + dy * dy);
+  }
+  if (perimeter < 2000) {
+    document.getElementById('te-instructions').textContent = 'Track too small! Draw a bigger loop. (' + Math.round(perimeter) + '/2000)';
+    return;
+  }
   teMyTrackPoints = tePoints.slice();
   teCleanup();
   document.getElementById('track-editor').style.display = 'none';
-  document.getElementById('mp-lobby').style.display = 'flex';
 
-  // Send track data to server
-  if (ws && ws.readyState === 1) {
-    var nameEl = document.getElementById('mp-create-name');
-    if (!nameEl || !nameEl.value) nameEl = document.getElementById('mp-join-name');
-    var username = nameEl ? (nameEl.value.trim() || 'Player') : 'Player';
-    ws.send(JSON.stringify({
-      type: 'submit_track',
-      username: username,
-      points: teMyTrackPoints
-    }));
+  if (teFromSinglePlayer) {
+    // Single player - store and go back to setup
+    spCustomTrackPoints = teMyTrackPoints;
+    document.getElementById('setup-screen').style.display = 'flex';
+    document.getElementById('draw-track-sp-btn').textContent = 'REDRAW TRACK';
+  } else {
+    // Multiplayer - send to server
+    document.getElementById('mp-lobby').style.display = 'flex';
+    if (ws && ws.readyState === 1) {
+      var nameEl = document.getElementById('mp-create-name');
+      if (!nameEl || !nameEl.value) nameEl = document.getElementById('mp-join-name');
+      var username = nameEl ? (nameEl.value.trim() || 'Player') : 'Player';
+      ws.send(JSON.stringify({
+        type: 'submit_track',
+        username: username,
+        points: teMyTrackPoints
+      }));
+    }
+    document.getElementById('mp-draw-track-btn').textContent = 'REDRAW TRACK';
   }
+}
 
-  // Update draw button text
-  document.getElementById('mp-draw-track-btn').textContent = 'REDRAW TRACK';
+function openTrackEditorSP() {
+  teFromSinglePlayer = true;
+  document.getElementById('setup-screen').style.display = 'none';
+  openTrackEditor();
 }
 
 function teCleanup() {
