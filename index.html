@@ -1027,23 +1027,23 @@ function drawTrack() {
   ctx.moveTo(track.innerWall[0].x, track.innerWall[0].y);
   for (let i = track.innerWall.length - 1; i >= 0; i--) ctx.lineTo(track.innerWall[i].x, track.innerWall[i].y);
   ctx.closePath();
-  ctx.fillStyle = '#333';
+  ctx.fillStyle = '#444';
   ctx.fill();
 
-  // Track borders
-  ctx.beginPath();
-  for (const p of track.outerWall) ctx.lineTo(p.x, p.y);
-  ctx.closePath();
-  ctx.strokeStyle = '#888';
-  ctx.lineWidth = 3;
-  ctx.stroke();
-
-  ctx.beginPath();
-  for (const p of track.innerWall) ctx.lineTo(p.x, p.y);
-  ctx.closePath();
-  ctx.strokeStyle = '#888';
-  ctx.lineWidth = 3;
-  ctx.stroke();
+  // Track borders - red and white curbs
+  const curbs = [track.outerWall, track.innerWall];
+  for (const wall of curbs) {
+    const segLen = 12; // length of each red/white stripe
+    for (let i = 0; i < wall.length - 1; i++) {
+      const stripe = Math.floor(i / segLen) % 2;
+      ctx.beginPath();
+      ctx.moveTo(wall[i].x, wall[i].y);
+      ctx.lineTo(wall[i + 1].x, wall[i + 1].y);
+      ctx.strokeStyle = stripe === 0 ? '#dd2222' : '#ffffff';
+      ctx.lineWidth = 4;
+      ctx.stroke();
+    }
+  }
 
   // Dashed centerline
   ctx.beginPath();
@@ -1468,7 +1468,7 @@ function gameLoop(time) {
   const dt = Math.min(32, time - lastTime);
   lastTime = time;
 
-  ctx.fillStyle = '#1a1a1a';
+  ctx.fillStyle = '#2d5a1e';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   if (track) {
