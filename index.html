@@ -496,6 +496,94 @@ function getSpeedMultiplier(r) {
   return 1 + raceProgress * 0.6; // 1.0x at start, 1.6x at final lap finish
 }
 
+// Traffic cones - placed along centerline, can be smashed
+let cones = [];
+
+function spawnCones() {
+  cones = [];
+  if (!track) return;
+  const cl = track.centerline.length;
+  // Place 4-8 clusters of cones along the track
+  const numClusters = 4 + Math.floor(Math.random() * 5);
+  for (let c = 0; c < numClusters; c++) {
+    const startIdx = Math.floor(Math.random() * cl);
+    const count = 3 + Math.floor(Math.random() * 6); // 3-8 cones per cluster
+    for (let i = 0; i < count; i++) {
+      const idx = (startIdx + i * 4) % cl;
+      const p = track.centerline[idx];
+      const n = track.normals[idx];
+      // Slight random offset from centerline
+      const offset = (Math.random() - 0.5) * 20;
+      cones.push({
+        x: p.x + n.x * offset,
+        y: p.y + n.y * offset,
+        vx: 0, vy: 0,
+        angle: Math.random() * Math.PI * 2,
+        spin: 0,
+        hit: false,
+        alpha: 1
+      });
+    }
+  }
+}
+
+function updateCones(allCars) {
+  for (const cone of cones) {
+    // Check collision with all cars
+    for (const car of allCars) {
+      const dx = cone.x - car.x;
+      const dy = cone.y - car.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist < 14 && dist > 0.1) {
+        // Smash! Push cone in car's direction
+        const pushSpeed = car.speed * 0.8;
+        cone.vx = Math.cos(car.angle) * pushSpeed + (dx / dist) * 2;
+        cone.vy = Math.sin(car.angle) * pushSpeed + (dy / dist) * 2;
+        cone.spin = (Math.random() - 0.5) * 0.5;
+        cone.hit = true;
+        // Tiny speed reduction for player
+        if (car.id === 0) car.speed *= 0.98;
+      }
+    }
+    // Physics
+    cone.x += cone.vx;
+    cone.y += cone.vy;
+    cone.vx *= 0.95;
+    cone.vy *= 0.95;
+    cone.angle += cone.spin;
+    cone.spin *= 0.97;
+    if (cone.hit) cone.alpha = Math.max(0, cone.alpha - 0.003);
+  }
+  // Remove fully faded cones
+  cones = cones.filter(c => c.alpha > 0.01);
+}
+
+function drawCones() {
+  for (const cone of cones) {
+    ctx.save();
+    ctx.translate(cone.x, cone.y);
+    ctx.rotate(cone.angle);
+    ctx.globalAlpha = cone.alpha;
+    // Orange cone body
+    ctx.beginPath();
+    ctx.moveTo(0, -5);
+    ctx.lineTo(-4, 5);
+    ctx.lineTo(4, 5);
+    ctx.closePath();
+    ctx.fillStyle = '#ff6600';
+    ctx.fill();
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 1;
+    // White stripe
+    ctx.beginPath();
+    ctx.moveTo(-2, 1);
+    ctx.lineTo(2, 1);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+    ctx.restore();
+  }
+}
+
 // Particles: sparks, exhaust, tire marks
 const particles = [];
 const tireMarks = []; // persistent marks on track
@@ -974,7 +1062,7 @@ function updateRacer(r, dt, allRacers) {
     }
   }
 
-  const COL_DIST = (CAR_LENGTH + CAR_WIDTH) / 2;
+  const COL_DIST = CAR_LENGTH;
   for (const other of allRacers) {
     if (other.id === r.id) continue;
     const dx = other.x - r.x;
@@ -1089,6 +1177,7 @@ function drawTrack() {
 
   // Tire marks (under cars)
   drawParticles();
+  drawCones();
 
   // Draw racers and player
   for (const r of racers) {
@@ -1242,7 +1331,7 @@ function updatePlayer(r, dt) {
   }
 
   // Car-car collision with push physics
-  const COL_DIST_P = (CAR_LENGTH + CAR_WIDTH) / 2;
+  const COL_DIST_P = CAR_LENGTH;
   for (const other of racers) {
     if (other.id === r.id) continue;
     const dx = other.x - r.x;
@@ -1522,17 +1611,20 @@ function gameLoop(time) {
       for (const r of allCarsVfx) {
         if (r.speed > 1) addExhaust(r.x, r.y, r.angle);
       }
-      // Skid marks for player only
+      // Skid marks for player only - only on hard turns
       if (player) {
         if (!player.skidTimer) player.skidTimer = 0;
-        if (Math.abs(player.steerAngle) > 0.025 && player.speed > 2) {
-          player.skidTimer = Math.min(player.skidTimer + 10, 180);
+        if (Math.abs(player.steerAngle) > 0.04 && player.speed > 3) {
+          player.skidTimer = Math.min(player.skidTimer + 8, 180);
         }
         if (player.skidTimer > 0) {
           addTireMark(player.x, player.y, player.angle, CAR_WIDTH * 0.8);
           player.skidTimer--;
         }
       }
+      // Update cones
+      const allCarsForCones = [player, ...racers].filter(Boolean);
+      updateCones(allCarsForCones);
       updateParticles();
 
       if (finishOrder.length >= mpTotalRacers) {
@@ -1670,6 +1762,7 @@ function initTrackAndRacers(rng) {
 
   camera.x = player.x;
   camera.y = player.y;
+  spawnCones();
 }
 
 function startRace(isAutoRestart) {
