@@ -1577,11 +1577,13 @@ function drawCar(r) {
   }
   if (r._shadowCanvas) {
     ctx.save();
-    ctx.globalAlpha = 0.12;
-    ctx.translate(r.x + 3, r.y + 5);
+    ctx.globalAlpha = 0.15;
+    ctx.filter = 'blur(3px)';
+    ctx.translate(r.x + 2, r.y + 3);
     ctx.rotate(r.angle);
     ctx.rotate(Math.PI);
     ctx.drawImage(r._shadowCanvas, -w / 2, -h / 2, w, h);
+    ctx.filter = 'none';
     ctx.globalAlpha = 1;
     ctx.restore();
   }
