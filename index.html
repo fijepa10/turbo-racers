@@ -6,9 +6,31 @@
 <style>
 @font-face { font-family: 'LedLight'; src: url('LEDLIGHT.otf') format('opentype'); }
 * { margin: 0; padding: 0; box-sizing: border-box; }
-body { background: #111; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; font-family: 'Segoe UI', sans-serif; color: #fff; overflow: hidden; }
+html { overflow: hidden; }
+body {
+  background: #111; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  font-family: 'Segoe UI', sans-serif; color: #fff; overflow: hidden;
+  width: 200vw; height: 200vh;
+  transform: scale(0.5);
+  transform-origin: top left;
+}
+/* Scale everything back up pixelated */
+html {
+  width: 50vw; height: 50vh;
+  transform: scale(2);
+  transform-origin: top left;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  -webkit-font-smoothing: none;
+}
 
-canvas#c { border: none; }
+canvas#c {
+  border: none;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  position: fixed; top: 0; left: 0;
+  width: 100vw; height: 100vh;
+}
 #ui { position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,0.7); padding: 12px; border-radius: 8px; font-size: 14px; min-width: 180px; display: none; z-index: 2; }
 #ui h3 { margin-bottom: 8px; font-size: 16px; color: #ffd700; }
 .pos-entry { display: flex; align-items: center; gap: 6px; margin: 3px 0; }
@@ -363,10 +385,12 @@ button:hover { transform: scale(1.05); }
 </div>
 
 <script>
+const PIXEL_DIV = 2;
 const canvas = document.getElementById('c');
 const ctx = canvas.getContext('2d');
-canvas.width = window.innerWidth;
-canvas.height = window.innerHeight;
+ctx.imageSmoothingEnabled = false;
+canvas.width = Math.floor(window.innerWidth / PIXEL_DIV);
+canvas.height = Math.floor(window.innerHeight / PIXEL_DIV);
 
 
 
@@ -2293,8 +2317,9 @@ function resetRace() {
 
 // Handle resize
 window.addEventListener('resize', () => {
-  canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight;
+  canvas.width = Math.floor(window.innerWidth / PIXEL_DIV);
+  canvas.height = Math.floor(window.innerHeight / PIXEL_DIV);
+  ctx.imageSmoothingEnabled = false;
 });
 
 requestAnimationFrame(gameLoop);
@@ -2826,8 +2851,8 @@ function teOpen() {
   tePanX = 0; tePanY = 0; teZoom = 0.4;
   teMyTrackPoints = null;
   teCanvas = document.getElementById('track-editor-canvas');
-  teCanvas.width = window.innerWidth;
-  teCanvas.height = window.innerHeight;
+  teCanvas.width = Math.floor(window.innerWidth / PIXEL_DIV);
+  teCanvas.height = Math.floor(window.innerHeight / PIXEL_DIV);
   teCtx = teCanvas.getContext('2d');
   // Center pan so 0,0 is in the middle
   tePanX = -teCanvas.width / 2;
@@ -2849,8 +2874,8 @@ function teOpen() {
 
 function teResize() {
   if (!teCanvas) return;
-  teCanvas.width = window.innerWidth;
-  teCanvas.height = window.innerHeight;
+  teCanvas.width = Math.floor(window.innerWidth / PIXEL_DIV);
+  teCanvas.height = Math.floor(window.innerHeight / PIXEL_DIV);
   teDraw();
 }
 
