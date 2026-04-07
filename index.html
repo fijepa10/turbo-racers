@@ -8,56 +8,6 @@
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { background: #111; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; font-family: 'Segoe UI', sans-serif; color: #fff; overflow: hidden; }
 
-/* CRT TV Effect - Canvas-based distortion, CSS scanlines + vignette */
-
-/* Scanlines overlay - just the lines, no borders */
-#crt-overlay {
-  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-  pointer-events: none; z-index: 9999;
-}
-#crt-overlay::before {
-  content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-  background: repeating-linear-gradient(
-    0deg,
-    transparent 0px,
-    rgba(0,0,0,0.1) 1px,
-    transparent 2px,
-    transparent 3px
-  );
-  animation: crt-scanroll 10s linear infinite;
-}
-#crt-overlay::after {
-  content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-  background: radial-gradient(ellipse at center,
-    transparent 45%,
-    rgba(0,0,0,0.15) 60%,
-    rgba(0,0,0,0.4) 78%,
-    rgba(0,0,0,0.75) 95%
-  );
-}
-@keyframes crt-scanroll {
-  0% { background-position: 0 0; }
-  100% { background-position: 0 6px; }
-}
-/* Text glow/bloom on UI */
-#ui, #lap-info, #finish-screen, #main-menu h1, #countdown, button,
-#setup-screen, #mp-lobby, #track-editor-ui {
-  text-shadow: 0 0 10px rgba(255,255,255,0.2), 0 0 3px rgba(255,255,255,0.15);
-}
-#main-menu h1 {
-  text-shadow: 0 0 30px rgba(255,215,0,0.6), 3px 0 8px rgba(255,80,0,0.2), -3px 0 8px rgba(0,180,255,0.2) !important;
-}
-/* Bloom layer */
-#crt-bloom {
-  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-  pointer-events: none; z-index: 9996;
-  background: radial-gradient(ellipse at center,
-    rgba(255,245,220,0.05) 0%,
-    rgba(255,245,220,0.02) 40%,
-    transparent 70%
-  );
-  mix-blend-mode: screen;
-}
 canvas { border: 1px solid #333; }
 #ui { position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,0.7); padding: 12px; border-radius: 8px; font-size: 14px; min-width: 180px; display: none; }
 #ui h3 { margin-bottom: 8px; font-size: 16px; color: #ffd700; }
@@ -264,8 +214,6 @@ button:hover { transform: scale(1.05); }
 </style>
 </head>
 <body>
-<div id="crt-overlay"></div>
-<div id="crt-bloom"></div>
 <canvas id="c"></canvas>
 <div id="ui"><h3>Positions</h3><div id="positions"></div></div>
 <div id="lap-info">Lap <span id="lap-current">0</span> / <span id="lap-total">3</span></div>
@@ -1932,107 +1880,6 @@ function updateUI() {
 
 // ---- Speedometer Gauge ----
 
-// CRT barrel distortion + bloom + chromatic aberration
-var crtBuffer = null;
-var crtCtx = null;
-function applyCRTEffect() {
-  var w = canvas.width, h = canvas.height;
-  // Create offscreen buffer once
-  if (!crtBuffer || crtBuffer.width !== w || crtBuffer.height !== h) {
-    crtBuffer = document.createElement('canvas');
-    crtBuffer.width = w;
-    crtBuffer.height = h;
-    crtCtx = crtBuffer.getContext('2d');
-  }
-  // Copy current frame
-  crtCtx.drawImage(canvas, 0, 0);
-
-  // Clear and redraw with barrel distortion using grid sampling
-  ctx.fillStyle = '#000';
-  ctx.fillRect(0, 0, w, h);
-
-  var strength = 0.08; // distortion strength
-  var gridSize = 20;   // grid cells
-  var cols = Math.ceil(w / gridSize) + 1;
-  var rows = Math.ceil(h / gridSize) + 1;
-
-  for (var gy = 0; gy < rows - 1; gy++) {
-    for (var gx = 0; gx < cols - 1; gx++) {
-      // Source rectangle (undistorted)
-      var sx = gx * gridSize;
-      var sy = gy * gridSize;
-      var sw = gridSize;
-      var sh = gridSize;
-
-      // Destination - apply barrel distortion to each corner
-      var corners = [
-        barrelDistort(sx, sy, w, h, strength),
-        barrelDistort(sx + sw, sy, w, h, strength),
-        barrelDistort(sx + sw, sy + sh, w, h, strength),
-        barrelDistort(sx, sy + sh, w, h, strength)
-      ];
-
-      // Draw distorted quad using drawImage with clip
-      // Approximate with simple stretch to bounding box
-      var minX = Math.min(corners[0].x, corners[3].x);
-      var minY = Math.min(corners[0].y, corners[1].y);
-      var maxX = Math.max(corners[1].x, corners[2].x);
-      var maxY = Math.max(corners[2].y, corners[3].y);
-
-      ctx.drawImage(crtBuffer, sx, sy, sw, sh, minX, minY, maxX - minX, maxY - minY);
-    }
-  }
-
-  // Chromatic aberration - strong RGB channel separation
-  ctx.globalCompositeOperation = 'lighter';
-  // Red channel shifted right
-  ctx.globalAlpha = 0.12;
-  ctx.filter = 'saturate(0) brightness(0.8)';
-  ctx.drawImage(canvas, 4, 1);
-  // Blue/cyan channel shifted left
-  ctx.drawImage(canvas, -4, -1);
-  ctx.filter = 'none';
-  ctx.globalAlpha = 1;
-  ctx.globalCompositeOperation = 'source-over';
-
-  // Color tint - warm phosphor glow
-  ctx.globalCompositeOperation = 'overlay';
-  ctx.globalAlpha = 0.04;
-  ctx.fillStyle = '#ff8844';
-  ctx.fillRect(0, 0, w, h);
-  ctx.globalAlpha = 1;
-  ctx.globalCompositeOperation = 'source-over';
-
-  // Bloom - blurred bright glow
-  ctx.globalCompositeOperation = 'lighter';
-  ctx.globalAlpha = 0.1;
-  ctx.filter = 'blur(12px) brightness(1.8)';
-  ctx.drawImage(canvas, 0, 0);
-  ctx.filter = 'none';
-  ctx.globalAlpha = 1;
-  ctx.globalCompositeOperation = 'source-over';
-
-  // Boost contrast/saturation
-  ctx.globalCompositeOperation = 'overlay';
-  ctx.globalAlpha = 0.03;
-  ctx.fillStyle = '#000';
-  ctx.fillRect(0, 0, w, h);
-  ctx.globalAlpha = 1;
-  ctx.globalCompositeOperation = 'source-over';
-}
-
-function barrelDistort(x, y, w, h, k) {
-  // Normalize to -1..1
-  var nx = (x / w - 0.5) * 2;
-  var ny = (y / h - 0.5) * 2;
-  var r2 = nx * nx + ny * ny;
-  var distort = 1 + k * r2;
-  return {
-    x: (nx * distort / 2 + 0.5) * w,
-    y: (ny * distort / 2 + 0.5) * h
-  };
-}
-
 function drawSpeedometer() {
   if (!player) return;
   const mph = Math.round(player.speed * 20);
@@ -2263,7 +2110,6 @@ function gameLoop(time) {
     updateEngineSound();
     drawTrack();
     drawSpeedometer();
-    applyCRTEffect();
     updateUI();
   }
 
