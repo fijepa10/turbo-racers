@@ -1577,13 +1577,11 @@ function addDent(car, worldX, worldY) {
   // Flip because sprite is drawn rotated 180
   lx = -lx;
   ly = -ly;
-  car.dents.push({ lx: lx, ly: ly, strength: 1.5 + Math.random() * 1.5 });
+  car.dents.push({ lx: lx, ly: ly, strength: 0.5 + Math.random() * 0.5 });
 }
 
 function drawCarMesh(ctx, sprite, x, y, w, h, dents, isPlayer) {
-  // Higher res for player, lower for AI to save perf
-  var cols = isPlayer ? 10 : 6;
-  var rows = isPlayer ? 10 : 6;
+  var cols = 10, rows = 10;
   var cellW = w / cols, cellH = h / rows;
   var sw = sprite.width / cols, sh = sprite.height / rows;
   var centerX = x + w / 2, centerY = y + h / 2;
@@ -1620,8 +1618,8 @@ function drawCarMesh(ctx, sprite, x, y, w, h, dents, isPlayer) {
               falloff = falloff * falloff * falloff;
               var push = falloff * dent.strength;
               if (dist > 0.1) {
-                vx -= (ddx / dist) * push * 0.5;
-                vy -= (ddy / dist) * push * 0.5;
+                vx -= (ddx / dist) * push * 0.25;
+                vy -= (ddy / dist) * push * 0.25;
               }
             }
           }
