@@ -8,12 +8,13 @@
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { background: #111; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; font-family: 'Segoe UI', sans-serif; color: #fff; overflow: hidden; }
 
-canvas { border: 1px solid #333; }
-#ui { position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,0.7); padding: 12px; border-radius: 8px; font-size: 14px; min-width: 180px; display: none; }
+canvas#c { border: 1px solid #333; position: relative; z-index: 0; }
+#gl-canvas { position: fixed; top: 0; left: 0; z-index: 1; pointer-events: none; border: none; }
+#ui { position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,0.7); padding: 12px; border-radius: 8px; font-size: 14px; min-width: 180px; display: none; z-index: 2; }
 #ui h3 { margin-bottom: 8px; font-size: 16px; color: #ffd700; }
 .pos-entry { display: flex; align-items: center; gap: 6px; margin: 3px 0; }
 .color-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
-#lap-info { position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.7); padding: 12px; border-radius: 8px; font-size: 14px; display: none; }
+#lap-info { position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.7); padding: 12px; border-radius: 8px; font-size: 14px; display: none; z-index: 2; }
 #countdown { position: absolute; font-size: 120px; font-weight: bold; color: #ffd700; text-shadow: 0 0 40px rgba(255,215,0,0.6); z-index: 5; display: none; }
 #finish-screen { position: absolute; display: none; flex-direction: column; align-items: center; gap: 16px; background: rgba(0,0,0,0.85); padding: 40px; border-radius: 16px; z-index: 10; }
 #finish-screen h2 { font-size: 36px; color: #ffd700; }
@@ -215,6 +216,7 @@ button:hover { transform: scale(1.05); }
 </head>
 <body>
 <canvas id="c"></canvas>
+<canvas id="gl-canvas"></canvas>
 <div id="ui"><h3>Positions</h3><div id="positions"></div></div>
 <div id="lap-info">Lap <span id="lap-current">0</span> / <span id="lap-total">3</span></div>
 
@@ -367,6 +369,160 @@ const canvas = document.getElementById('c');
 const ctx = canvas.getContext('2d');
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
+
+// ---- CRT Post-Processing ----
+let glCanvas, gl, crtProgram, crtTex, crtVB, crtTimeLoc, crtResLoc, crtEnabled = false;
+
+function initCRT() {
+  try {
+    glCanvas = document.getElementById('gl-canvas');
+    if (!glCanvas) return;
+    glCanvas.width = canvas.width;
+    glCanvas.height = canvas.height;
+    gl = glCanvas.getContext('webgl', { alpha: false, antialias: false, premultipliedAlpha: false });
+    if (!gl) { console.warn('WebGL not available, CRT disabled'); return; }
+
+    const vsrc = `attribute vec2 a_pos;varying vec2 v_uv;void main(){v_uv=a_pos*0.5+0.5;gl_Position=vec4(a_pos,0,1);}`;
+    const fsrc = `
+precision mediump float;
+varying vec2 v_uv;
+uniform sampler2D u_tex;
+uniform float u_time;
+uniform vec2 u_res;
+
+vec2 barrelDistort(vec2 uv, float amt) {
+  vec2 cc = uv - 0.5;
+  float dist = dot(cc, cc);
+  return uv + cc * dist * amt;
+}
+
+void main() {
+  float distStr = 0.15;
+  vec2 uv = barrelDistort(v_uv, distStr);
+
+  // Out-of-bounds check
+  if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) {
+    gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
+    return;
+  }
+
+  // Chromatic aberration - increases toward edges
+  vec2 center = uv - 0.5;
+  float edgeDist = dot(center, center);
+  float caStr = 0.003 + edgeDist * 0.012;
+  vec2 caDir = normalize(center + 0.0001) * caStr;
+  float r = texture2D(u_tex, barrelDistort(v_uv + caDir, distStr)).r;
+  float g = texture2D(u_tex, uv).g;
+  float b = texture2D(u_tex, barrelDistort(v_uv - caDir, distStr)).b;
+  vec3 col = vec3(r, g, b);
+
+  // Bloom - sample blurred neighbors
+  vec3 bloom = vec3(0.0);
+  float bSize = 3.0;
+  for (float i = -2.0; i <= 2.0; i += 1.0) {
+    for (float j = -2.0; j <= 2.0; j += 1.0) {
+      vec2 off = vec2(i, j) * bSize / u_res;
+      bloom += texture2D(u_tex, uv + off).rgb;
+    }
+  }
+  bloom /= 25.0;
+  // Only add bloom from bright areas
+  vec3 brightPass = max(bloom - 0.5, 0.0) * 2.0;
+  col += brightPass * 0.3;
+
+  // Scanlines
+  float scanline = sin(uv.y * u_res.y * 3.14159) * 0.5 + 0.5;
+  col *= 0.92 + 0.08 * scanline;
+
+  // Vignette
+  float vig = 1.0 - edgeDist * 1.8;
+  vig = clamp(vig, 0.0, 1.0);
+  vig = sqrt(vig);
+  col *= vig;
+
+  // Warm phosphor tint
+  col *= vec3(1.05, 1.0, 0.92);
+
+  // Subtle flicker
+  float flicker = 1.0 - 0.015 * sin(u_time * 8.0 + uv.y * 2.0);
+  col *= flicker;
+
+  gl_FragColor = vec4(col, 1.0);
+}`;
+
+    function compileShader(src, type) {
+      var s = gl.createShader(type);
+      gl.shaderSource(s, src);
+      gl.compileShader(s);
+      if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+        console.error('Shader error:', gl.getShaderInfoLog(s));
+        return null;
+      }
+      return s;
+    }
+    var vs = compileShader(vsrc, gl.VERTEX_SHADER);
+    var fs = compileShader(fsrc, gl.FRAGMENT_SHADER);
+    if (!vs || !fs) return;
+
+    crtProgram = gl.createProgram();
+    gl.attachShader(crtProgram, vs);
+    gl.attachShader(crtProgram, fs);
+    gl.linkProgram(crtProgram);
+    if (!gl.getProgramParameter(crtProgram, gl.LINK_STATUS)) {
+      console.error('Program link error:', gl.getProgramInfoLog(crtProgram));
+      return;
+    }
+    gl.useProgram(crtProgram);
+
+    crtTimeLoc = gl.getUniformLocation(crtProgram, 'u_time');
+    crtResLoc = gl.getUniformLocation(crtProgram, 'u_res');
+    var texLoc = gl.getUniformLocation(crtProgram, 'u_tex');
+    gl.uniform1i(texLoc, 0);
+
+    // Full-screen quad
+    crtVB = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, crtVB);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
+    var posLoc = gl.getAttribLocation(crtProgram, 'a_pos');
+    gl.enableVertexAttribArray(posLoc);
+    gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
+
+    // Texture for game canvas
+    crtTex = gl.createTexture();
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, crtTex);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+
+    crtEnabled = true;
+    glCanvas.style.display = 'block';
+  } catch (e) {
+    console.warn('CRT init failed:', e);
+    crtEnabled = false;
+  }
+}
+
+function renderCRT(time) {
+  if (!crtEnabled) return;
+  gl.viewport(0, 0, glCanvas.width, glCanvas.height);
+  gl.activeTexture(gl.TEXTURE0);
+  gl.bindTexture(gl.TEXTURE_2D, crtTex);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, canvas);
+  gl.useProgram(crtProgram);
+  gl.uniform1f(crtTimeLoc, (time || 0) * 0.001);
+  gl.uniform2f(crtResLoc, glCanvas.width, glCanvas.height);
+  gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+}
+
+function resizeCRT() {
+  if (!glCanvas) return;
+  glCanvas.width = canvas.width;
+  glCanvas.height = canvas.height;
+}
+
+initCRT();
 
 const TOTAL_LAPS = 3;
 const TRACK_WIDTH = 90;
@@ -2113,6 +2269,7 @@ function gameLoop(time) {
     updateUI();
   }
 
+  renderCRT(time);
   requestAnimationFrame(gameLoop);
 }
 
@@ -2293,6 +2450,7 @@ function resetRace() {
 window.addEventListener('resize', () => {
   canvas.width = window.innerWidth;
   canvas.height = window.innerHeight;
+  resizeCRT();
 });
 
 requestAnimationFrame(gameLoop);
