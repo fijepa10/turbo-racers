@@ -162,6 +162,10 @@ wss.on('connection', (ws) => {
           if (msg.totalProgress !== undefined) p.totalProgress = msg.totalProgress;
           if (msg.boostTimer !== undefined) p.boostTimer = msg.boostTimer;
         }
+        // Host sends AI positions
+        if (msg.aiPositions && ws.playerId === room.hostId) {
+          room.aiPositions = msg.aiPositions;
+        }
         break;
       }
     }
@@ -313,10 +317,9 @@ function startGameLoop(room) {
     }
 
     // Broadcast inputs to all clients so they can simulate
-    broadcastToRoom(room, {
-      type: 'state',
-      players: states
-    });
+    var stateMsg = { type: 'state', players: states };
+    if (room.aiPositions) stateMsg.ai = room.aiPositions;
+    broadcastToRoom(room, stateMsg);
 
     // Check for race timeout (15 min)
     if (Date.now() - room.raceStartTime > 15 * 60 * 1000) {

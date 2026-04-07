@@ -254,7 +254,7 @@ button:hover { transform: scale(1.05); }
   <button class="menu-btn secondary" onclick="showSettingsScreen()">SETTINGS</button>
   <p class="coming-soon-tooltip" id="coming-soon-msg">COMING SOON</p>
   <p style="color:#555;font-size:12px;margin-top:8px">Arrow keys or WASD to drive</p>
-  <p id="version-text" style="color:#333;font-size:10px;margin-top:12px">v1.0.0</p>
+  <p id="version-text" style="color:#333;font-size:10px;margin-top:12px">v1.1.0</p>
 </div>
 
 <!-- Single Player Setup -->
@@ -2548,6 +2548,7 @@ function createRNG(seed) {
 // ---- Multiplayer State ----
 var ws = null;
 var myPlayerId = null;
+var mpIsHost = false;
 var isMultiplayer = false;
 var mpRoomCode = null;
 var mpIsHost = false;
@@ -2786,6 +2787,21 @@ function mpHandleMessage(msg) {
 
     case 'state':
       mpHandleStateUpdate(msg.players);
+      // Non-host clients apply host's AI positions
+      if (!mpIsHost && msg.ai && racers) {
+        for (var ai = 0; ai < msg.ai.length; ai++) {
+          var ad = msg.ai[ai];
+          if (ad.idx >= 0 && ad.idx < racers.length && !racers[ad.idx]._isRemoteHuman) {
+            racers[ad.idx].x = ad.x;
+            racers[ad.idx].y = ad.y;
+            racers[ad.idx].angle = ad.angle;
+            racers[ad.idx].speed = ad.speed;
+            racers[ad.idx].lap = ad.lap;
+            racers[ad.idx].totalProgress = ad.totalProgress;
+            racers[ad.idx].progress = ad.progress;
+          }
+        }
+      }
       break;
   }
 }
@@ -2976,7 +2992,7 @@ function mpSendInput() {
   if (keys['ArrowUp'] || keys['w'] || keys['W']) throttle = 1;
   if (keys['ArrowDown'] || keys['s'] || keys['S']) brake = 1;
 
-  ws.send(JSON.stringify({
+  var msg = {
     type: 'input',
     steering: steering,
     throttle: throttle,
@@ -2989,7 +3005,25 @@ function mpSendInput() {
     progress: player.progress,
     totalProgress: player.totalProgress,
     boostTimer: player.boostTimer || 0
-  }));
+  };
+
+  // Host broadcasts AI bot positions so all clients stay in sync
+  if (mpIsHost && racers.length > 0) {
+    var aiData = [];
+    for (var i = 0; i < racers.length; i++) {
+      var r = racers[i];
+      if (!r._isRemoteHuman) {
+        aiData.push({
+          idx: i,
+          x: r.x, y: r.y, angle: r.angle, speed: r.speed,
+          lap: r.lap, totalProgress: r.totalProgress, progress: r.progress
+        });
+      }
+    }
+    if (aiData.length > 0) msg.aiPositions = aiData;
+  }
+
+  ws.send(JSON.stringify(msg));
 }
 
 // ---- Network: Handle State Updates ----
@@ -3028,27 +3062,12 @@ function mpInterpolateRemote(r, dt) {
   var target = mpRemotePlayers[r.mpId];
   if (!target) return;
 
-  // Simple direct lerp toward server position
-  var dx = target.targetX - r.x;
-  var dy = target.targetY - r.y;
-  var dist = Math.sqrt(dx * dx + dy * dy);
+  // Snap to server position directly for accuracy
+  r.x = target.targetX;
+  r.y = target.targetY;
+  r.angle = target.targetAngle;
+  r.speed = target.targetSpeed;
 
-  if (dist > 200 || isNaN(r.x) || isNaN(r.y)) {
-    // Snap if too far or corrupted
-    r.x = target.targetX;
-    r.y = target.targetY;
-    r.angle = target.targetAngle;
-    r.speed = target.targetSpeed;
-  } else {
-    // Smooth lerp
-    r.x += dx * 0.3;
-    r.y += dy * 0.3;
-    var ad = target.targetAngle - r.angle;
-    while (ad > Math.PI) ad -= Math.PI * 2;
-    while (ad < -Math.PI) ad += Math.PI * 2;
-    r.angle += ad * 0.3;
-    r.speed += (target.targetSpeed - r.speed) * 0.3;
-  }
 }
 
 // ---- Multiplayer Reset ----
