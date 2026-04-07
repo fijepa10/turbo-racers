@@ -369,7 +369,7 @@ button:hover { transform: scale(1.05); }
 </div>
 
 <script>
-const PIXEL_DIV = 2;
+const PIXEL_DIV = 4;
 const canvas = document.getElementById('c');
 const ctx = canvas.getContext('2d');
 ctx.imageSmoothingEnabled = false;
@@ -1850,7 +1850,7 @@ function updateCamera() {
   camera.x += (targetX - camera.x) * 0.08;
   camera.y += (targetY - camera.y) * 0.08;
 
-  const targetZoom = (player && player.boostTimer > 0) ? 2.0 : 2.5;
+  const targetZoom = (player && player.boostTimer > 0) ? 0.5 : 0.7;
   camera.zoom += (targetZoom - camera.zoom) * 0.03;
 }
 
@@ -1894,9 +1894,9 @@ function drawSpeedometer() {
   if (!player) return;
   const mph = Math.round(player.speed * 20);
   const maxMPH = 200;
-  const radius = 120;
-  const cx = 40 + radius;
-  const cy = canvas.height - 40;
+  const radius = 50;
+  const cx = 15 + radius;
+  const cy = canvas.height - 15;
   const startAngle = Math.PI;
   const endAngle = Math.PI * 2;
 
