@@ -254,7 +254,7 @@ button:hover { transform: scale(1.05); }
   <button class="menu-btn secondary" onclick="showSettingsScreen()">SETTINGS</button>
   <p class="coming-soon-tooltip" id="coming-soon-msg">COMING SOON</p>
   <p style="color:#555;font-size:12px;margin-top:8px">Arrow keys or WASD to drive</p>
-  <p id="version-text" style="color:#333;font-size:10px;margin-top:12px">v1.4.0</p>
+  <p id="version-text" style="color:#333;font-size:10px;margin-top:12px">v1.5.0</p>
 </div>
 
 <!-- Single Player Setup -->
@@ -3034,7 +3034,14 @@ function mpHandleStateUpdate(remotePlayers) {
   if (!racers || !track) return;
   for (var si = 0; si < remotePlayers.length; si++) {
     var rp = remotePlayers[si];
-    if (rp.id === myPlayerId) continue; // Skip our own data
+
+    // For our own player, update totalProgress from server so leaderboard agrees
+    if (rp.id === myPlayerId) {
+      if (player && rp.totalProgress !== undefined) {
+        player.totalProgress = rp.totalProgress;
+      }
+      continue;
+    }
 
     // Find the matching racer
     for (var ri = 0; ri < racers.length; ri++) {
