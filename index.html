@@ -1031,8 +1031,9 @@ window.addEventListener('keyup', e => { keys[e.key] = false; keys[e.code] = fals
 
 function generateTrack(trackBaseRadius, trackNumPoints, rng) {
   const rand = rng || Math.random;
-  const cx = canvas.width / 2;
-  const cy = canvas.height / 2;
+  // Fixed center so all clients generate track at same world position
+  const cx = 0;
+  const cy = 0;
   const baseRadius = trackBaseRadius || (900 + rand() * 400);
   const numPoints = trackNumPoints || 1200;
 
