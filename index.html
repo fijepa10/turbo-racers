@@ -1565,8 +1565,6 @@ function drawTrack() {
 
 function addDent(car, worldX, worldY) {
   if (!car.dents) car.dents = [];
-  // 6 second delay at race start before dents can happen
-  if (performance.now() - raceStartTime < 6000) return;
   // Convert world hit position to car-local coordinates
   var dx = worldX - car.x;
   var dy = worldY - car.y;
@@ -1578,7 +1576,7 @@ function addDent(car, worldX, worldY) {
   // Flip because sprite is drawn rotated 180
   lx = -lx;
   ly = -ly;
-  car.dents.push({ lx: lx, ly: ly, strength: 3 + Math.random() * 3 });
+  car.dents.push({ lx: lx, ly: ly, strength: 1.5 + Math.random() * 1.5 });
 }
 
 function drawCarMesh(ctx, sprite, x, y, w, h, dents, isPlayer) {
