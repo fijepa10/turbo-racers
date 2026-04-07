@@ -647,6 +647,54 @@ function getSpeedMultiplier(r) {
   return 1 + raceProgress * 0.6; // 1.0x at start, 1.6x at final lap finish
 }
 
+// Spectator crowds along track edges
+let crowds = [];
+const CROWD_COLORS = ['#e74c3c','#3498db','#2ecc71','#f39c12','#9b59b6','#e67e22','#1abc9c','#ecf0f1','#f1c40f','#e84393'];
+
+function spawnCrowds() {
+  crowds = [];
+  if (!track) return;
+  const cl = track.centerline.length;
+  // Place 6-12 clusters of spectators along the track
+  const numClusters = 6 + Math.floor(Math.random() * 7);
+  for (let c = 0; c < numClusters; c++) {
+    const startIdx = Math.floor(Math.random() * cl);
+    const side = Math.random() > 0.5 ? 1 : -1; // inner or outer wall
+    const count = 5 + Math.floor(Math.random() * 12); // 5-16 people per cluster
+    for (let i = 0; i < count; i++) {
+      const idx = (startIdx + i * 2) % cl;
+      const p = track.centerline[idx];
+      const n = track.normals[idx];
+      // Place just outside the track wall
+      const dist = (TRACK_WIDTH / 2) + 6 + Math.random() * 12;
+      const lateralJitter = (Math.random() - 0.5) * 4;
+      crowds.push({
+        x: p.x + n.x * (dist + lateralJitter) * side,
+        y: p.y + n.y * (dist + lateralJitter) * side,
+        color: CROWD_COLORS[Math.floor(Math.random() * CROWD_COLORS.length)],
+        headColor: '#' + Math.floor(Math.random() * 0x444444 + 0xaaaaaa).toString(16),
+        size: 2 + Math.random() * 1.5,
+        bobPhase: Math.random() * Math.PI * 2,
+        bobSpeed: 2 + Math.random() * 3
+      });
+    }
+  }
+}
+
+function drawCrowds(time) {
+  for (const s of crowds) {
+    const bob = Math.sin((time || 0) * 0.003 * s.bobSpeed + s.bobPhase) * 0.8;
+    // Body
+    ctx.fillStyle = s.color;
+    ctx.fillRect(s.x - s.size * 0.4, s.y - s.size + bob, s.size * 0.8, s.size * 1.2);
+    // Head
+    ctx.fillStyle = s.headColor;
+    ctx.beginPath();
+    ctx.arc(s.x, s.y - s.size * 1.1 + bob, s.size * 0.45, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
 // Boost crate system - one at a time on track
 let crate = null;
 let crateDebris = [];
@@ -1483,6 +1531,9 @@ function drawTrack() {
   ctx.scale(camera.zoom, camera.zoom);
   ctx.translate(-camera.x + camera.shakeX, -camera.y + camera.shakeY);
 
+  // Spectator crowds (on grass, behind track)
+  drawCrowds(lastTime);
+
   // Track surface
   ctx.beginPath();
   ctx.moveTo(track.outerWall[0].x, track.outerWall[0].y);
@@ -2192,7 +2243,7 @@ function initTrackAndRacers(rng, customTrackPoints) {
 
   camera.x = player.x;
   camera.y = player.y;
-  crate = null; crateDebris = []; crateRespawnTimer = 120; crateRng = null;
+  crate = null; crateDebris = []; crateRespawnTimer = 120; crateRng = null; spawnCrowds();
 }
 
 function startRace(isAutoRestart) {
@@ -3438,7 +3489,7 @@ mpStartMultiplayerRace = function(msg) {
     camera.y = player.y;
   }
 
-  crate = null; crateDebris = []; crateRespawnTimer = 120; crateRng = null;
+  crate = null; crateDebris = []; crateRespawnTimer = 120; crateRng = null; spawnCrowds();
   raceState = 'countdown';
   var cdOverlay = document.getElementById('mp-countdown-overlay');
   cdOverlay.style.display = 'block';
