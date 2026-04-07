@@ -2736,21 +2736,46 @@ function mpHandleStateUpdate(remotePlayers) {
 function mpInterpolateRemote(r, dt) {
   var target = mpRemotePlayers[r.mpId];
   if (!target) return;
-  var lerpRate = 0.2;
-  r.x += (target.targetX - r.x) * lerpRate;
-  r.y += (target.targetY - r.y) * lerpRate;
 
-  // Angle interpolation (handle wrapping)
-  var angleDiff = target.targetAngle - r.angle;
-  while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
-  while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
-  r.angle += angleDiff * lerpRate;
+  // Snap quickly to server position - faster lerp prevents drifting off track
+  var dx = target.targetX - r.x;
+  var dy = target.targetY - r.y;
+  var dist = Math.sqrt(dx * dx + dy * dy);
 
-  r.speed += (target.targetSpeed - r.speed) * lerpRate;
+  // If too far from target, snap immediately
+  if (dist > 100) {
+    r.x = target.targetX;
+    r.y = target.targetY;
+    r.angle = target.targetAngle;
+    r.speed = target.targetSpeed;
+  } else {
+    var lerpRate = 0.4; // fast interpolation
+    r.x += dx * lerpRate;
+    r.y += dy * lerpRate;
 
-  // Move car forward based on interpolated speed
-  r.x += Math.cos(r.angle) * r.speed * 0.1;
-  r.y += Math.sin(r.angle) * r.speed * 0.1;
+    var angleDiff = target.targetAngle - r.angle;
+    while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+    while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+    r.angle += angleDiff * lerpRate;
+
+    r.speed += (target.targetSpeed - r.speed) * lerpRate;
+  }
+
+  // Clamp remote player to track bounds
+  if (track) {
+    var ci = closestCenterlineIndexNear(r.x, r.y, r.progress || 0);
+    var cp = track.centerline[ci];
+    var cn = track.normals[ci];
+    var toCar = { x: r.x - cp.x, y: r.y - cp.y };
+    var dotN = toCar.x * cn.x + toCar.y * cn.y;
+    var hw = TRACK_WIDTH / 2 - CAR_WIDTH;
+    if (Math.abs(dotN) > hw) {
+      var sign = dotN > 0 ? 1 : -1;
+      r.x = cp.x + cn.x * hw * sign;
+      r.y = cp.y + cn.y * hw * sign;
+    }
+    r.progress = ci;
+  }
 }
 
 // ---- Multiplayer Reset ----
