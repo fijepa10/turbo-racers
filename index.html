@@ -254,7 +254,7 @@ button:hover { transform: scale(1.05); }
   <button class="menu-btn secondary" onclick="showSettingsScreen()">SETTINGS</button>
   <p class="coming-soon-tooltip" id="coming-soon-msg">COMING SOON</p>
   <p style="color:#555;font-size:12px;margin-top:8px">Arrow keys or WASD to drive</p>
-  <p id="version-text" style="color:#333;font-size:10px;margin-top:12px">v1.3.0</p>
+  <p id="version-text" style="color:#333;font-size:10px;margin-top:12px">v1.4.0</p>
 </div>
 
 <!-- Single Player Setup -->
@@ -2260,13 +2260,15 @@ function gameLoop(time) {
           // In multiplayer, skip updateRacer for remote human players (they're interpolated)
           if (isMultiplayer && r._isRemoteHuman) {
             mpInterpolateRemote(r, dt);
-            // Progress/lap for remote humans comes from server relay - don't compute locally
-            // Finish detection based on server-relayed lap count
             if (r.lap >= TOTAL_LAPS && !r.finished) {
               r.finished = true;
               r.finishTime = performance.now();
               finishOrder.push(r);
             }
+          } else if (isMultiplayer && !mpIsHost && !r._isRemoteHuman) {
+            // Non-host: AI bots just dead-reckon, host sends real positions
+            r.x += Math.cos(r.angle) * r.speed;
+            r.y += Math.sin(r.angle) * r.speed;
           } else {
             updateRacer(r, dt, allCars);
           }
