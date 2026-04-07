@@ -1983,20 +1983,40 @@ function applyCRTEffect() {
     }
   }
 
-  // Chromatic aberration - offset red and blue channels
+  // Chromatic aberration - strong RGB channel separation
   ctx.globalCompositeOperation = 'lighter';
-  ctx.globalAlpha = 0.04;
-  ctx.drawImage(canvas, 3, 0);   // red-ish shift right
-  ctx.drawImage(canvas, -3, 0);  // blue-ish shift left
+  // Red channel shifted right
+  ctx.globalAlpha = 0.12;
+  ctx.filter = 'saturate(0) brightness(0.8)';
+  ctx.drawImage(canvas, 4, 1);
+  // Blue/cyan channel shifted left
+  ctx.drawImage(canvas, -4, -1);
+  ctx.filter = 'none';
   ctx.globalAlpha = 1;
   ctx.globalCompositeOperation = 'source-over';
 
-  // Bloom - draw blurred bright areas additively
+  // Color tint - warm phosphor glow
+  ctx.globalCompositeOperation = 'overlay';
+  ctx.globalAlpha = 0.04;
+  ctx.fillStyle = '#ff8844';
+  ctx.fillRect(0, 0, w, h);
+  ctx.globalAlpha = 1;
+  ctx.globalCompositeOperation = 'source-over';
+
+  // Bloom - blurred bright glow
   ctx.globalCompositeOperation = 'lighter';
-  ctx.globalAlpha = 0.06;
-  ctx.filter = 'blur(8px) brightness(1.5)';
+  ctx.globalAlpha = 0.1;
+  ctx.filter = 'blur(12px) brightness(1.8)';
   ctx.drawImage(canvas, 0, 0);
   ctx.filter = 'none';
+  ctx.globalAlpha = 1;
+  ctx.globalCompositeOperation = 'source-over';
+
+  // Boost contrast/saturation
+  ctx.globalCompositeOperation = 'overlay';
+  ctx.globalAlpha = 0.03;
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0, 0, w, h);
   ctx.globalAlpha = 1;
   ctx.globalCompositeOperation = 'source-over';
 }
