@@ -821,7 +821,7 @@ function drawCrate() {
   ctx.stroke();
   // Question mark or bolt symbol
   ctx.fillStyle = '#ffd700';
-  ctx.font = 'bold 12px sans-serif';
+  ctx.font = 'bold 12px monospace';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText('⚡', 0, 0);
@@ -1575,7 +1575,13 @@ function drawCar(r) {
     ctx.rotate(Math.PI);
     const h = CAR_LENGTH;
     const w = h * (sprite.width / sprite.height);
-    ctx.drawImage(sprite, -w / 2, -h / 2, w, h);
+    // Crop source to skip the drop shadow border (10% on each side)
+    const crop = 0.1;
+    const sx = sprite.width * crop;
+    const sy = sprite.height * crop;
+    const sw = sprite.width * (1 - crop * 2);
+    const sh = sprite.height * (1 - crop * 2);
+    ctx.drawImage(sprite, sx, sy, sw, sh, -w / 2, -h / 2, w, h);
   } else {
     ctx.fillStyle = r.color;
     ctx.beginPath();
@@ -1872,17 +1878,17 @@ function drawHUD(sorted) {
   // ---- Positions list (top-left) ----
   const px = 4;
   var py = 4;
-  const lineH = 9;
-  const fontSize = 7;
+  const lineH = 8;
+  const fontSize = 5;
 
   // Background box
-  const boxW = 70;
+  const boxW = 55;
   const boxH = 10 + sorted.length * lineH;
   ctx.fillStyle = 'rgba(0,0,0,0.65)';
   ctx.fillRect(px - 2, py - 2, boxW, boxH);
 
   // Header
-  ctx.font = 'bold ' + fontSize + 'px sans-serif';
+  ctx.font = 'bold ' + fontSize + 'px monospace';
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
   ctx.fillStyle = '#ffd700';
@@ -1890,7 +1896,7 @@ function drawHUD(sorted) {
   py += lineH + 1;
 
   // Entries
-  ctx.font = fontSize + 'px sans-serif';
+  ctx.font = fontSize + 'px monospace';
   for (var i = 0; i < sorted.length; i++) {
     var r = sorted[i];
     var lapDisplay = Math.min(r.lap, TOTAL_LAPS);
@@ -1928,7 +1934,7 @@ function drawHUD(sorted) {
     var ry = 4;
 
     // Background box
-    var lapBoxW = 52;
+    var lapBoxW = 40;
     var lapBoxH = 20;
     ctx.fillStyle = 'rgba(0,0,0,0.65)';
     ctx.fillRect(rx - lapBoxW, ry - 2, lapBoxW + 2, lapBoxH);
@@ -1937,12 +1943,12 @@ function drawHUD(sorted) {
     ctx.textBaseline = 'top';
 
     // Lap line
-    ctx.font = 'bold ' + fontSize + 'px sans-serif';
+    ctx.font = 'bold ' + fontSize + 'px monospace';
     ctx.fillStyle = '#fff';
     ctx.fillText('LAP ' + currentLap + '/' + TOTAL_LAPS, rx, ry);
 
     // Percentage
-    ctx.font = fontSize + 'px sans-serif';
+    ctx.font = fontSize + 'px monospace';
     ctx.fillStyle = '#aaa';
     ctx.fillText('Race: ' + pct + '%', rx, ry + lineH);
   }
@@ -1956,128 +1962,32 @@ function drawSpeedometer() {
   if (!player) return;
   const mph = Math.round(player.speed * 20);
   const maxMPH = 200;
-  const radius = 35;
-  const cx = 15 + radius;
-  const cy = canvas.height - 50;
-  const startAngle = Math.PI;
-  const endAngle = Math.PI * 2;
+  const r = 12;
+  const cx = 5 + r;
+  const cy = canvas.height - 18;
 
   ctx.save();
 
-  // Dark background
-  ctx.beginPath();
-  ctx.arc(cx, cy, radius + 10, startAngle, endAngle, false);
-  ctx.lineTo(cx + radius + 10, cy + 6);
-  ctx.lineTo(cx - radius - 10, cy + 6);
-  ctx.closePath();
-  ctx.fillStyle = 'rgba(0,0,0,0.75)';
-  ctx.fill();
+  // Background
+  ctx.fillStyle = 'rgba(0,0,0,0.7)';
+  ctx.fillRect(cx - r - 3, cy - r - 3, r * 2 + 6, r + 14);
 
-  // Outer ring glow
-  ctx.beginPath();
-  ctx.arc(cx, cy, radius + 2, startAngle, endAngle, false);
-  ctx.strokeStyle = 'rgba(255,60,60,0.15)';
-  ctx.lineWidth = 6;
-  ctx.stroke();
+  // Speed bar
+  const barW = r * 2;
+  const barH = 3;
+  const barX = cx - r;
+  const barY = cy - 2;
+  ctx.fillStyle = '#333';
+  ctx.fillRect(barX, barY, barW, barH);
+  const frac = Math.min(mph / maxMPH, 1);
+  ctx.fillStyle = frac < 0.5 ? '#4f4' : frac < 0.8 ? '#ff0' : '#f22';
+  ctx.fillRect(barX, barY, barW * frac, barH);
 
-  // Arc track (grey)
-  ctx.beginPath();
-  ctx.arc(cx, cy, radius, startAngle, endAngle, false);
-  ctx.strokeStyle = '#444';
-  ctx.lineWidth = 8;
-  ctx.stroke();
-
-  // Colored arc showing current speed
-  const speedFraction = Math.min(mph / maxMPH, 1);
-  const needleAngle = startAngle + speedFraction * (endAngle - startAngle);
-  if (speedFraction > 0) {
-    ctx.beginPath();
-    ctx.arc(cx, cy, radius, startAngle, needleAngle, false);
-    const grad = ctx.createLinearGradient(cx - radius, cy, cx + radius, cy);
-    grad.addColorStop(0, '#44ff44');
-    grad.addColorStop(0.5, '#ffdd00');
-    grad.addColorStop(1, '#ff2222');
-    ctx.strokeStyle = grad;
-    ctx.lineWidth = 8;
-    ctx.stroke();
-  }
-
-  // Speed markings
-  const marks = [0, 50, 100, 150, 200];
-  ctx.fillStyle = '#ccc';
-  ctx.font = '11px "Segoe UI", sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  for (const m of marks) {
-    const frac = m / maxMPH;
-    const a = startAngle + frac * (endAngle - startAngle);
-    // Tick mark
-    const innerR = radius - 12;
-    const outerR = radius - 2;
-    ctx.beginPath();
-    ctx.moveTo(cx + Math.cos(a) * innerR, cy + Math.sin(a) * innerR);
-    ctx.lineTo(cx + Math.cos(a) * outerR, cy + Math.sin(a) * outerR);
-    ctx.strokeStyle = '#aaa';
-    ctx.lineWidth = 2;
-    ctx.stroke();
-    // Label
-    const labelR = radius - 24;
-    ctx.fillText(m, cx + Math.cos(a) * labelR, cy + Math.sin(a) * labelR);
-  }
-
-  // Minor ticks
-  for (let m = 0; m <= maxMPH; m += 10) {
-    if (m % 50 === 0) continue;
-    const frac = m / maxMPH;
-    const a = startAngle + frac * (endAngle - startAngle);
-    const innerR = radius - 6;
-    const outerR = radius - 2;
-    ctx.beginPath();
-    ctx.moveTo(cx + Math.cos(a) * innerR, cy + Math.sin(a) * innerR);
-    ctx.lineTo(cx + Math.cos(a) * outerR, cy + Math.sin(a) * outerR);
-    ctx.strokeStyle = '#666';
-    ctx.lineWidth = 1;
-    ctx.stroke();
-  }
-
-  // Needle
-  ctx.save();
-  ctx.translate(cx, cy);
-  ctx.rotate(needleAngle);
-  // Needle glow
-  ctx.shadowColor = 'rgba(255,40,40,0.6)';
-  ctx.shadowBlur = 12;
-  ctx.beginPath();
-  ctx.moveTo(radius - 18, 0);
-  ctx.lineTo(-12, -3);
-  ctx.lineTo(-12, 3);
-  ctx.closePath();
-  ctx.fillStyle = '#ff2222';
-  ctx.fill();
-  ctx.shadowBlur = 0;
-  ctx.restore();
-
-  // Center cap
-  ctx.beginPath();
-  ctx.arc(cx, cy, 8, 0, Math.PI * 2);
-  ctx.fillStyle = '#cc0000';
-  ctx.fill();
-  ctx.beginPath();
-  ctx.arc(cx, cy, 4, 0, Math.PI * 2);
-  ctx.fillStyle = '#ff4444';
-  ctx.fill();
-
-  // Digital MPH readout
-  ctx.font = 'bold 22px "Segoe UI", sans-serif';
-  ctx.textAlign = 'center';
+  // MPH text
+  ctx.font = '5px monospace';
   ctx.fillStyle = '#fff';
-  ctx.shadowColor = 'rgba(255,255,255,0.3)';
-  ctx.shadowBlur = 6;
-  ctx.fillText(mph, cx, cy + 20);
-  ctx.shadowBlur = 0;
-  ctx.font = '10px "Segoe UI", sans-serif';
-  ctx.fillStyle = '#888';
-  ctx.fillText('MPH', cx, cy + 34);
+  ctx.textAlign = 'center';
+  ctx.fillText(mph + ' MPH', cx, cy + 7);
 
   ctx.restore();
 }
