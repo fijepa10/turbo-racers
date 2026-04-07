@@ -1174,6 +1174,7 @@ function createRacer(id, startIdx, colorIdx, rng) {
     cornerCut,
     steerAngle: 0,
     boostTimer: 0,
+    dents: [], // {lx, ly, strength} in car-local coords
     lap: 0,
     progress: startIdx,
     totalProgress: 0,
@@ -1422,6 +1423,7 @@ function updateRacer(r, dt, allRacers) {
       r.y = cp.y + cn.y * hw * sign;
       r.angle += correctionAngle * 0.3;
       r.speed *= 0.95;
+      addDent(r, r.x, r.y);
       if (r.id === 0) {
         addSparks(r.x, r.y, 6);
         shakeCamera(4);
@@ -1451,6 +1453,8 @@ function updateRacer(r, dt, allRacers) {
       other.y += Math.sin(r.angle) * pushForce;
       const colCx = (r.x + other.x) / 2, colCy = (r.y + other.y) / 2;
       addSparks(colCx, colCy, 3);
+      addDent(r, colCx, colCy);
+      addDent(other, colCx, colCy);
       if (r.id === 0 || other.id === 0) { shakeCamera(2); playCrash(); }
     }
   }
@@ -1558,6 +1562,71 @@ function drawTrack() {
   ctx.restore();
 }
 
+function addDent(car, worldX, worldY) {
+  if (!car.dents) car.dents = [];
+  if (car.dents.length >= 12) return;
+  // Convert world hit position to car-local coordinates
+  var dx = worldX - car.x;
+  var dy = worldY - car.y;
+  var cos = Math.cos(-car.angle);
+  var sin = Math.sin(-car.angle);
+  // Rotate into car space (car faces right at angle 0)
+  var lx = dx * cos - dy * sin;
+  var ly = dx * sin + dy * cos;
+  // Flip because sprite is drawn rotated 180
+  lx = -lx;
+  ly = -ly;
+  car.dents.push({ lx: lx, ly: ly, strength: 1.5 + Math.random() * 1.5 });
+}
+
+function drawCarMesh(ctx, sprite, x, y, w, h, dents) {
+  // Draw sprite as a deformed mesh grid
+  var cols = 10, rows = 10;
+  var cellW = w / cols, cellH = h / rows;
+  var sw = sprite.width / cols, sh = sprite.height / rows;
+
+  for (var row = 0; row < rows; row++) {
+    for (var col = 0; col < cols; col++) {
+      // Grid vertex position (undeformed)
+      var gx = x + col * cellW;
+      var gy = y + row * cellH;
+      // Apply dent displacement to each corner
+      var corners = [];
+      for (var cy = 0; cy <= 1; cy++) {
+        for (var cx = 0; cx <= 1; cx++) {
+          var vx = gx + cx * cellW;
+          var vy = gy + cy * cellH;
+          // Offset based on nearby dents
+          for (var d = 0; d < dents.length; d++) {
+            var dent = dents[d];
+            var ddx = vx - (x + w/2 + dent.lx);
+            var ddy = vy - (y + h/2 + dent.ly);
+            var dist = Math.sqrt(ddx * ddx + ddy * ddy);
+            var radius = 8;
+            if (dist < radius) {
+              var falloff = 1 - dist / radius;
+              falloff = falloff * falloff;
+              var push = falloff * dent.strength;
+              // Push vertex toward the dent center
+              if (dist > 0.1) {
+                vx -= (ddx / dist) * push * 0.3;
+                vy -= (ddy / dist) * push * 0.3;
+              }
+            }
+          }
+          corners.push({ x: vx, y: vy });
+        }
+      }
+      // Draw this cell as a simple stretched quad (drawImage to bounding box)
+      var minX = Math.min(corners[0].x, corners[1].x, corners[2].x, corners[3].x);
+      var minY = Math.min(corners[0].y, corners[1].y, corners[2].y, corners[3].y);
+      var maxX = Math.max(corners[0].x, corners[1].x, corners[2].x, corners[3].x);
+      var maxY = Math.max(corners[0].y, corners[1].y, corners[2].y, corners[3].y);
+      ctx.drawImage(sprite, col * sw, row * sh, sw, sh, minX, minY, maxX - minX, maxY - minY);
+    }
+  }
+}
+
 function drawCar(r) {
   const h = CAR_LENGTH;
   const sprite = carSprites[r.color];
@@ -1595,7 +1664,11 @@ function drawCar(r) {
 
   if (sprite) {
     ctx.rotate(Math.PI);
-    ctx.drawImage(sprite, -w / 2, -h / 2, w, h);
+    if (r.dents && r.dents.length > 0) {
+      drawCarMesh(ctx, sprite, -w / 2, -h / 2, w, h, r.dents);
+    } else {
+      ctx.drawImage(sprite, -w / 2, -h / 2, w, h);
+    }
   } else {
     ctx.fillStyle = r.color;
     ctx.beginPath();
@@ -1793,6 +1866,7 @@ function updatePlayer(r, dt) {
     }
     addSparks(r.x, r.y, 3);
     shakeCamera(2);
+    addDent(r, r.x, r.y);
   }
   // Safety: clamp position to sane range
   if (isNaN(r.x) || isNaN(r.y) || isNaN(r.angle) || isNaN(r.speed)) {
@@ -1823,9 +1897,12 @@ function updatePlayer(r, dt) {
       const pushForce = r.speed * 0.15;
       other.x += Math.cos(r.angle) * pushForce;
       other.y += Math.sin(r.angle) * pushForce;
-      addSparks((r.x + other.x) / 2, (r.y + other.y) / 2, 4);
+      var hitX = (r.x + other.x) / 2, hitY = (r.y + other.y) / 2;
+      addSparks(hitX, hitY, 4);
       shakeCamera(3);
       playCrash();
+      addDent(r, hitX, hitY);
+      addDent(other, hitX, hitY);
     }
   }
 
