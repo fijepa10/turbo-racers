@@ -1029,7 +1029,7 @@ window.addEventListener('keyup', e => { keys[e.key] = false; keys[e.code] = fals
 
 // ---- Track Generation ----
 
-function generateTrack(trackBaseRadius, trackNumPoints, rng) {
+function generateTrack(trackBaseRadius, trackNumPoints, rng, skipRotate) {
   const rand = rng || Math.random;
   // Fixed center so all clients generate track at same world position
   const cx = 0;
@@ -1122,7 +1122,7 @@ function generateTrack(trackBaseRadius, trackNumPoints, rng) {
   }
 
   var result = { centerline, normals, distances, totalLength, innerWall, outerWall, innerSegments, outerSegments };
-  return rotateStartToStraight(result);
+  return skipRotate ? result : rotateStartToStraight(result);
 }
 
 // Rotate track arrays so index 0 (start/finish line) is on the straightest section
@@ -2404,7 +2404,7 @@ function initTrackAndRacers(rng, customTrackPoints) {
   } else {
     const preset = TRACK_PRESETS[selectedTrackLength] || TRACK_PRESETS.medium;
     const trackRadius = preset.baseRadiusMin + rand() * (preset.baseRadiusMax - preset.baseRadiusMin);
-    track = generateTrack(trackRadius, preset.numPoints, rng);
+    track = generateTrack(trackRadius, preset.numPoints, rng, isMultiplayer);
   }
   racers = [];
   finishOrder = [];
@@ -2883,7 +2883,7 @@ function mpStartMultiplayerRace(msg) {
   crateRng = createRNG(msg.seed + 12345); // offset seed for crates
   var preset = TRACK_PRESETS[selectedTrackLength] || TRACK_PRESETS.medium;
   var trackRadius = preset.baseRadiusMin + rng() * (preset.baseRadiusMax - preset.baseRadiusMin);
-  track = generateTrack(trackRadius, preset.numPoints, rng);
+  track = generateTrack(trackRadius, preset.numPoints, rng, isMultiplayer);
 
   racers = [];
   finishOrder = [];
@@ -3431,7 +3431,7 @@ function generateTrackFromPoints(userPoints) {
   }
 
   var result = { centerline: centerline, normals: normals, distances: distances, totalLength: totalLength, innerWall: innerWall, outerWall: outerWall, innerSegments: innerSegments, outerSegments: outerSegments };
-  return rotateStartToStraight(result);
+  return isMultiplayer ? result : rotateStartToStraight(result);
 }
 
 function catmullRomLoop(points, numOut) {
@@ -3649,7 +3649,7 @@ mpStartMultiplayerRace = function(msg) {
   } else {
     var preset = TRACK_PRESETS[selectedTrackLength] || TRACK_PRESETS.medium;
     var trackRadius = preset.baseRadiusMin + rng() * (preset.baseRadiusMax - preset.baseRadiusMin);
-    track = generateTrack(trackRadius, preset.numPoints, rng);
+    track = generateTrack(trackRadius, preset.numPoints, rng, isMultiplayer);
   }
 
   racers = [];
