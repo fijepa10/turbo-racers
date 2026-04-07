@@ -254,7 +254,7 @@ button:hover { transform: scale(1.05); }
   <button class="menu-btn secondary" onclick="showSettingsScreen()">SETTINGS</button>
   <p class="coming-soon-tooltip" id="coming-soon-msg">COMING SOON</p>
   <p style="color:#555;font-size:12px;margin-top:8px">Arrow keys or WASD to drive</p>
-  <p id="version-text" style="color:#333;font-size:10px;margin-top:12px">v1.6.0</p>
+  <p id="version-text" style="color:#333;font-size:10px;margin-top:12px">v1.6.1</p>
 </div>
 
 <!-- Single Player Setup -->
@@ -388,15 +388,15 @@ button:hover { transform: scale(1.05); }
   <h2>SETTINGS</h2>
   <div class="settings-row">
     <span class="settings-label">Car Denting</span>
-    <label class="settings-toggle"><input type="checkbox" id="set-denting" checked onchange="settings.denting=this.checked"><span class="toggle-slider"></span></label>
+    <label class="settings-toggle"><input type="checkbox" id="set-denting" onchange="settings.denting=this.checked"><span class="toggle-slider"></span></label>
   </div>
   <div class="settings-row">
     <span class="settings-label">Drop Shadows</span>
-    <label class="settings-toggle"><input type="checkbox" id="set-shadows" checked onchange="settings.shadows=this.checked"><span class="toggle-slider"></span></label>
+    <label class="settings-toggle"><input type="checkbox" id="set-shadows" onchange="settings.shadows=this.checked"><span class="toggle-slider"></span></label>
   </div>
   <div class="settings-row">
     <span class="settings-label">Sound Effects</span>
-    <label class="settings-toggle"><input type="checkbox" id="set-sound" checked onchange="settings.sound=this.checked"><span class="toggle-slider"></span></label>
+    <label class="settings-toggle"><input type="checkbox" id="set-sound" onchange="settings.sound=this.checked"><span class="toggle-slider"></span></label>
   </div>
   <div class="settings-row">
     <span class="settings-label">Speedometer Style</span>
@@ -470,7 +470,7 @@ let finishOrder = [];
 const AUTOPILOT = false;
 
 // ---- Settings ----
-var settings = { denting: true, shadows: true, sound: true, speedoStyle: 'gauge' };
+var settings = { denting: false, shadows: false, sound: false, speedoStyle: 'gauge' };
 var mpAutopilot = false;
 
 function showSettingsScreen() {
