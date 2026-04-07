@@ -1565,6 +1565,7 @@ function drawTrack() {
 
 function addDent(car, worldX, worldY) {
   if (!car.dents) car.dents = [];
+  if (performance.now() - raceStartTime < 6000) return;
   // Convert world hit position to car-local coordinates
   var dx = worldX - car.x;
   var dy = worldY - car.y;
