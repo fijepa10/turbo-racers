@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" style="filter: url(#pixelate); overflow: hidden;">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <title>TURBO RACERS</title>
@@ -8,7 +8,10 @@
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { background: #111; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; font-family: 'Segoe UI', sans-serif; color: #fff; overflow: hidden; }
 
-canvas#c { border: none; }
+canvas#c { border: none; image-rendering: pixelated; image-rendering: crisp-edges; }
+/* Pixelate entire page */
+body { zoom: 0.5; image-rendering: pixelated; }
+html { zoom: 2; image-rendering: pixelated; image-rendering: crisp-edges; overflow: hidden; }
 #ui { position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,0.7); padding: 12px; border-radius: 8px; font-size: 14px; min-width: 180px; display: none; z-index: 2; }
 #ui h3 { margin-bottom: 8px; font-size: 16px; color: #ffd700; }
 .pos-entry { display: flex; align-items: center; gap: 6px; margin: 3px 0; }
@@ -214,15 +217,6 @@ button:hover { transform: scale(1.05); }
 </style>
 </head>
 <body>
-<svg xmlns="http://www.w3.org/2000/svg" style="position:absolute;width:0;height:0">
-  <filter id="pixelate" x="0" y="0" width="100%" height="100%">
-    <feFlood x="2" y="2" width="4" height="4"/>
-    <feComposite width="8" height="8"/>
-    <feTile result="tiled"/>
-    <feComposite in="SourceGraphic" in2="tiled" operator="in"/>
-    <feMorphology operator="dilate" radius="4"/>
-  </filter>
-</svg>
 <canvas id="c"></canvas>
 <div id="ui"><h3>Positions</h3><div id="positions"></div></div>
 <div id="lap-info">Lap <span id="lap-current">0</span> / <span id="lap-total">3</span></div>
