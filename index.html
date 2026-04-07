@@ -1174,8 +1174,6 @@ function createRacer(id, startIdx, colorIdx, rng) {
     cornerCut,
     steerAngle: 0,
     boostTimer: 0,
-    damage: 0, // 0 to 1
-    scratches: [], // visual scratch marks
     lap: 0,
     progress: startIdx,
     totalProgress: 0,
@@ -1562,21 +1560,6 @@ function drawTrack() {
   ctx.restore();
 }
 
-function addScratch(r, impactAngle) {
-  if (!r.scratches) r.scratches = [];
-  if (r.scratches.length > 8) return; // max scratches
-  // Position scratch in car-local space
-  var angle = impactAngle !== undefined ? impactAngle : (Math.random() - 0.5) * Math.PI;
-  var dist = 3 + Math.random() * 8;
-  r.scratches.push({
-    x: Math.cos(angle) * dist,
-    y: Math.sin(angle) * dist,
-    angle: angle + (Math.random() - 0.5) * 1.5,
-    len: 3 + Math.random() * 6,
-    width: 0.5 + Math.random() * 1.5
-  });
-}
-
 function drawCar(r) {
   const h = CAR_LENGTH;
   const sprite = carSprites[r.color];
@@ -1612,12 +1595,6 @@ function drawCar(r) {
   ctx.translate(r.x, r.y);
   ctx.rotate(r.angle);
 
-  // Slight wobble at high damage
-  var dmg = r.damage || 0;
-  if (dmg > 0.5) {
-    ctx.rotate(Math.sin(Date.now() * 0.02) * dmg * 0.03);
-  }
-
   if (sprite) {
     ctx.rotate(Math.PI);
     ctx.drawImage(sprite, -w / 2, -h / 2, w, h);
@@ -1632,54 +1609,7 @@ function drawCar(r) {
     ctx.fill();
   }
 
-  // Draw scratches and dents
-  if (r.scratches && r.scratches.length > 0) {
-    for (var si = 0; si < r.scratches.length; si++) {
-      var s = r.scratches[si];
-      ctx.save();
-      ctx.translate(s.x, s.y);
-      ctx.rotate(s.angle);
-      // Dark scratch line
-      ctx.strokeStyle = 'rgba(30,30,30,0.7)';
-      ctx.lineWidth = s.width;
-      ctx.beginPath();
-      ctx.moveTo(-s.len / 2, 0);
-      ctx.lineTo(s.len / 2, 0);
-      ctx.stroke();
-      // Lighter edge (metallic scratch look)
-      ctx.strokeStyle = 'rgba(180,180,180,0.3)';
-      ctx.lineWidth = s.width * 0.5;
-      ctx.beginPath();
-      ctx.moveTo(-s.len / 2, -0.5);
-      ctx.lineTo(s.len / 2, -0.5);
-      ctx.stroke();
-      ctx.restore();
-    }
-  }
-
-  // Dark tint overlay proportional to damage
-  if (dmg > 0.1) {
-    ctx.globalAlpha = dmg * 0.25;
-    ctx.fillStyle = '#000';
-    ctx.fillRect(-w / 2, -h / 2, w, h);
-    ctx.globalAlpha = 1;
-  }
-
   ctx.restore();
-
-  // Smoke at high damage
-  if (dmg > 0.4 && r.speed > 1) {
-    particles.push({
-      x: r.x - Math.cos(r.angle) * 8 + (Math.random() - 0.5) * 4,
-      y: r.y - Math.sin(r.angle) * 8 + (Math.random() - 0.5) * 4,
-      vx: (Math.random() - 0.5) * 0.5,
-      vy: -0.3 - Math.random() * 0.5,
-      life: 20 + Math.random() * 15,
-      maxLife: 35,
-      type: 'exhaust',
-      size: 2 + dmg * 3,
-    });
-  }
 }
 
 function updatePlayer(r, dt) {
