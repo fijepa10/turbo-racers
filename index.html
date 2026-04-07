@@ -211,6 +211,33 @@ button:hover { transform: scale(1.05); }
 }
 #final-standings h2 { font-size: 36px; color: #ffd700; }
 #final-standings-results { font-size: 18px; line-height: 2; }
+
+/* ---- Settings Screen ---- */
+#settings-screen {
+  position: absolute; display: none; flex-direction: column; align-items: center; gap: 20px; z-index: 10;
+  background: rgba(10,10,10,0.95); padding: 40px 48px; border-radius: 16px; border: 1px solid #333;
+  min-width: 360px;
+}
+#settings-screen h2 { font-size: 32px; color: #ffd700; letter-spacing: 4px; margin-bottom: 8px; }
+.settings-row {
+  display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 10px 0;
+  border-bottom: 1px solid #222;
+}
+.settings-label { color: #ccc; font-size: 16px; }
+.settings-toggle { position: relative; display: inline-block; width: 48px; height: 26px; cursor: pointer; }
+.settings-toggle input { opacity: 0; width: 0; height: 0; }
+.toggle-slider {
+  position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: #333; border-radius: 26px; transition: 0.2s;
+}
+.toggle-slider:before {
+  content: ''; position: absolute; height: 20px; width: 20px; left: 3px; bottom: 3px;
+  background: #888; border-radius: 50%; transition: 0.2s;
+}
+.settings-toggle input:checked + .toggle-slider { background: #ffd700; }
+.settings-toggle input:checked + .toggle-slider:before { transform: translateX(22px); background: #111; }
+.settings-radio-group { display: flex; gap: 12px; }
+.settings-radio { color: #aaa; font-size: 14px; cursor: pointer; display: flex; align-items: center; gap: 4px; }
+.settings-radio input[type="radio"] { accent-color: #ffd700; }
 </style>
 </head>
 <body>
@@ -224,6 +251,7 @@ button:hover { transform: scale(1.05); }
   <p class="subtitle">High speed thrills</p>
   <button class="menu-btn" onclick="showSetup()">SINGLE PLAYER</button>
   <button class="menu-btn secondary" onclick="showMultiplayerLobby()">MULTIPLAYER</button>
+  <button class="menu-btn secondary" onclick="showSettingsScreen()">SETTINGS</button>
   <p class="coming-soon-tooltip" id="coming-soon-msg">COMING SOON</p>
   <p style="color:#555;font-size:12px;margin-top:8px">Arrow keys or WASD to drive</p>
 </div>
@@ -313,6 +341,7 @@ button:hover { transform: scale(1.05); }
     <div class="mp-room-code" id="mp-room-code-display"></div>
     <div class="mp-player-list" id="mp-player-list"></div>
     <div class="mp-status" id="mp-waiting-status">Waiting for players...</div>
+    <label style="color:#888;font-size:13px;display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="mp-autopilot-check" onchange="mpAutopilot=this.checked" style="accent-color:#ffd700"> Autopilot (testing)</label>
     <button class="mp-draw-btn" id="mp-draw-track-btn" onclick="teOpen()">DRAW TRACK</button>
     <button class="mp-btn start-race" id="mp-start-btn" onclick="mpStartGame()" style="display:none" disabled>START RACE</button>
   </div>
@@ -351,6 +380,32 @@ button:hover { transform: scale(1.05); }
   <h2>FINAL STANDINGS</h2>
   <div id="final-standings-results"></div>
   <button onclick="finalStandingsDone()">BACK TO MENU</button>
+</div>
+
+<!-- Settings Screen -->
+<div id="settings-screen">
+  <h2>SETTINGS</h2>
+  <div class="settings-row">
+    <span class="settings-label">Car Denting</span>
+    <label class="settings-toggle"><input type="checkbox" id="set-denting" checked onchange="settings.denting=this.checked"><span class="toggle-slider"></span></label>
+  </div>
+  <div class="settings-row">
+    <span class="settings-label">Drop Shadows</span>
+    <label class="settings-toggle"><input type="checkbox" id="set-shadows" checked onchange="settings.shadows=this.checked"><span class="toggle-slider"></span></label>
+  </div>
+  <div class="settings-row">
+    <span class="settings-label">Sound Effects</span>
+    <label class="settings-toggle"><input type="checkbox" id="set-sound" checked onchange="settings.sound=this.checked"><span class="toggle-slider"></span></label>
+  </div>
+  <div class="settings-row">
+    <span class="settings-label">Speedometer Style</span>
+    <div class="settings-radio-group">
+      <label class="settings-radio"><input type="radio" name="speedo-style" value="gauge" checked onchange="settings.speedoStyle=this.value"> Gauge</label>
+      <label class="settings-radio"><input type="radio" name="speedo-style" value="bar" onchange="settings.speedoStyle=this.value"> Bar</label>
+      <label class="settings-radio"><input type="radio" name="speedo-style" value="off" onchange="settings.speedoStyle=this.value"> Off</label>
+    </div>
+  </div>
+  <button class="menu-btn" onclick="hideSettingsScreen()">BACK</button>
 </div>
 
 <div id="mp-countdown-overlay"></div>
@@ -413,6 +468,25 @@ let raceStartTime = 0;
 let finishOrder = [];
 const AUTOPILOT = false;
 
+// ---- Settings ----
+var settings = { denting: true, shadows: true, sound: true, speedoStyle: 'gauge' };
+var mpAutopilot = false;
+
+function showSettingsScreen() {
+  document.getElementById('main-menu').style.display = 'none';
+  document.getElementById('settings-screen').style.display = 'flex';
+  document.getElementById('set-denting').checked = settings.denting;
+  document.getElementById('set-shadows').checked = settings.shadows;
+  document.getElementById('set-sound').checked = settings.sound;
+  var radios = document.querySelectorAll('input[name="speedo-style"]');
+  for (var i = 0; i < radios.length; i++) radios[i].checked = (radios[i].value === settings.speedoStyle);
+}
+
+function hideSettingsScreen() {
+  document.getElementById('settings-screen').style.display = 'none';
+  document.getElementById('main-menu').style.display = 'flex';
+}
+
 // ---- Setup state ----
 let selectedTrackLength = 'medium';
 let selectedCarColorIndex = 0;
@@ -447,6 +521,7 @@ function showMainMenu() {
   document.getElementById('track-editor').style.display = 'none';
   document.getElementById('round-info-overlay').style.display = 'none';
   document.getElementById('final-standings').style.display = 'none';
+  document.getElementById('settings-screen').style.display = 'none';
   // Stop all audio and clear race state
   stopAllAudio();
   track = null;
@@ -522,6 +597,7 @@ let thrusting = false;
 let lastCrashTime = 0;
 
 function initAudio() {
+  if (!settings.sound) return;
   if (audioCtx) return;
   audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   engineGain = audioCtx.createGain();
@@ -537,6 +613,7 @@ function initAudio() {
 }
 
 function playCrateSmash() {
+  if (!settings.sound) return;
   if (!audioCtx || !crateSmashBuffer) return;
   const src = audioCtx.createBufferSource();
   const gain = audioCtx.createGain();
@@ -548,6 +625,7 @@ function playCrateSmash() {
 }
 
 function startThrust() {
+  if (!settings.sound) return;
   if (thrusting || !thrustBuffer || !audioCtx) return;
   thrusting = true;
   thrustSource = audioCtx.createBufferSource();
@@ -582,6 +660,7 @@ function playCountdownBeep(isGo) {
 }
 
 function playCrash() {
+  if (!settings.sound) return;
   if (!audioCtx || performance.now() - lastCrashTime < 300) return; // debounce
   lastCrashTime = performance.now();
   const buf = Math.random() > 0.5 ? crash1Buffer : crash2Buffer;
@@ -597,6 +676,7 @@ function playCrash() {
 }
 
 function startScrape() {
+  if (!settings.sound) return;
   if (scraping || !scrapeBuffer || !audioCtx) return;
   scraping = true;
   scrapeSource = audioCtx.createBufferSource();
@@ -617,6 +697,7 @@ function stopScrape() {
 }
 
 function startEngineLoop() {
+  if (!settings.sound) return;
   if (!engineBuffer || engineStarted) return;
   engineStarted = true;
   engineSource = audioCtx.createBufferSource();
@@ -889,6 +970,10 @@ function updateParticles() {
       p.size *= 0.95;
       p.vx *= 0.92;
       p.vy *= 0.92;
+    } else if (p.type === 'smoke') {
+      p.size *= 1.04;
+      p.vx *= 0.94;
+      p.vy *= 0.94;
     }
     if (p.life <= 0) particles.splice(i, 1);
   }
@@ -925,6 +1010,11 @@ function drawParticles() {
       const g = Math.min(255, Math.floor(200 * alpha));
       const b = Math.floor(50 * alpha);
       ctx.fillStyle = `rgba(${r},${g},${b},${alpha * 0.8})`;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (p.type === 'smoke') {
+      ctx.fillStyle = `rgba(40,40,40,${alpha * 0.35})`;
       ctx.beginPath();
       ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
       ctx.fill();
@@ -1564,8 +1654,13 @@ function drawTrack() {
 }
 
 function addDent(car, worldX, worldY) {
+  if (!settings.denting) return;
   if (!car.dents) car.dents = [];
   if (performance.now() - raceStartTime < 6000) return;
+  // Cooldown: each car can only get a new dent every 500ms
+  var now = performance.now();
+  if (car._lastDentTime && now - car._lastDentTime < 500) return;
+  car._lastDentTime = now;
   // Convert world hit position to car-local coordinates
   var dx = worldX - car.x;
   var dy = worldY - car.y;
@@ -1577,7 +1672,7 @@ function addDent(car, worldX, worldY) {
   // Flip because sprite is drawn rotated 180, add jitter so dents don't stack
   lx = -lx + (Math.random() - 0.5) * 4;
   ly = -ly + (Math.random() - 0.5) * 4;
-  car.dents.push({ lx: lx, ly: ly, strength: 0.5 + Math.random() * 0.5 });
+  car.dents.push({ lx: lx, ly: ly, strength: 0.7 + Math.random() * 0.7 });
 }
 
 function drawCarMesh(ctx, sprite, x, y, w, h, dents, isPlayer) {
@@ -1653,7 +1748,7 @@ function drawCar(r) {
     sc.fillStyle = '#000';
     sc.fillRect(0, 0, sprite.width, sprite.height);
   }
-  if (r._shadowCanvas) {
+  if (settings.shadows && r._shadowCanvas) {
     ctx.save();
     ctx.globalAlpha = 0.15;
     ctx.filter = 'blur(3px)';
@@ -1690,6 +1785,24 @@ function drawCar(r) {
   }
 
   ctx.restore();
+
+  // Smoke based on dent count
+  if (r.dents && r.dents.length > 3 && r.speed > 1) {
+    var smokeChance = Math.min(r.dents.length * 0.06, 0.8);
+    if (Math.random() < smokeChance) {
+      var backX = r.x - Math.cos(r.angle) * 10 + (Math.random() - 0.5) * 4;
+      var backY = r.y - Math.sin(r.angle) * 10 + (Math.random() - 0.5) * 4;
+      particles.push({
+        x: backX, y: backY,
+        vx: -Math.cos(r.angle) * 0.3 + (Math.random() - 0.5) * 0.4,
+        vy: -Math.sin(r.angle) * 0.3 + (Math.random() - 0.5) * 0.4,
+        life: 25 + Math.random() * 15,
+        maxLife: 40,
+        type: 'smoke',
+        size: 2 + Math.random() * 2,
+      });
+    }
+  }
 }
 
 function updatePlayer(r, dt) {
@@ -1796,7 +1909,7 @@ function updatePlayer(r, dt) {
     return;
   }
 
-  if (AUTOPILOT) {
+  if (AUTOPILOT || (mpAutopilot && isMultiplayer)) {
     const lookAhead = 25;
     const targetIdx = (r.progress + lookAhead) % track.centerline.length;
     const target = track.centerline[targetIdx];
@@ -2000,8 +2113,47 @@ function updateUI() {
 
 function drawSpeedometer() {
   if (!player) return;
+  if (settings.speedoStyle === 'off') return;
   const mph = Math.round(player.speed * 20);
   const maxMPH = 200;
+
+  if (settings.speedoStyle === 'bar') {
+    // Bar speedometer - simple horizontal bar in bottom-left
+    ctx.save();
+    var barW = 200, barH = 18;
+    var bx = 30, by = canvas.height - 50;
+    // Background
+    ctx.fillStyle = 'rgba(0,0,0,0.7)';
+    ctx.beginPath();
+    ctx.roundRect(bx - 4, by - 4, barW + 8, barH + 28, 6);
+    ctx.fill();
+    // Track
+    ctx.fillStyle = '#333';
+    ctx.fillRect(bx, by, barW, barH);
+    // Fill
+    var frac = Math.min(mph / maxMPH, 1);
+    if (frac > 0) {
+      var grad = ctx.createLinearGradient(bx, 0, bx + barW, 0);
+      grad.addColorStop(0, '#44ff44');
+      grad.addColorStop(0.5, '#ffdd00');
+      grad.addColorStop(1, '#ff2222');
+      ctx.fillStyle = grad;
+      ctx.fillRect(bx, by, barW * frac, barH);
+    }
+    // Border
+    ctx.strokeStyle = '#555';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(bx, by, barW, barH);
+    // MPH text
+    ctx.font = 'bold 16px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#fff';
+    ctx.fillText(mph + ' MPH', bx + barW / 2, by + barH + 18);
+    ctx.restore();
+    return;
+  }
+
+  // Default gauge style
   const radius = 120;
   const cx = 40 + radius;
   const cy = canvas.height - 40;
