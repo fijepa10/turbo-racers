@@ -1559,15 +1559,29 @@ function drawTrack() {
 }
 
 function drawCar(r) {
+  const h = CAR_LENGTH;
+  const sprite = carSprites[r.color];
+  const w = sprite ? h * (sprite.width / sprite.height) : CAR_LENGTH;
+
+  // Drop shadow - always faces down, drawn before the car
+  ctx.save();
+  ctx.translate(r.x + 3, r.y + 4); // offset down-right
+  ctx.rotate(r.angle);
+  ctx.globalAlpha = 0.3;
+  ctx.fillStyle = '#000';
+  ctx.beginPath();
+  ctx.ellipse(0, 0, w / 2 - 1, h / 2.5, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalAlpha = 1;
+  ctx.restore();
+
+  // Car
   ctx.save();
   ctx.translate(r.x, r.y);
   ctx.rotate(r.angle);
 
-  const sprite = carSprites[r.color];
   if (sprite) {
     ctx.rotate(Math.PI);
-    const h = CAR_LENGTH;
-    const w = h * (sprite.width / sprite.height);
     ctx.drawImage(sprite, -w / 2, -h / 2, w, h);
   } else {
     ctx.fillStyle = r.color;
