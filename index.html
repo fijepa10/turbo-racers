@@ -1563,17 +1563,28 @@ function drawCar(r) {
   const sprite = carSprites[r.color];
   const w = sprite ? h * (sprite.width / sprite.height) : CAR_LENGTH;
 
-  // Drop shadow - always faces down, drawn before the car
-  ctx.save();
-  ctx.translate(r.x + 3, r.y + 4); // offset down-right
-  ctx.rotate(r.angle);
-  ctx.globalAlpha = 0.3;
-  ctx.fillStyle = '#000';
-  ctx.beginPath();
-  ctx.ellipse(0, 0, w / 2 - 1, h / 2.5, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.globalAlpha = 1;
-  ctx.restore();
+  // Drop shadow - car silhouette, always offset downward
+  if (sprite && !r._shadowCanvas) {
+    // Create shadow version once per car
+    r._shadowCanvas = document.createElement('canvas');
+    r._shadowCanvas.width = sprite.width;
+    r._shadowCanvas.height = sprite.height;
+    var sc = r._shadowCanvas.getContext('2d');
+    sc.drawImage(sprite, 0, 0);
+    sc.globalCompositeOperation = 'source-in';
+    sc.fillStyle = '#000';
+    sc.fillRect(0, 0, sprite.width, sprite.height);
+  }
+  if (r._shadowCanvas) {
+    ctx.save();
+    ctx.globalAlpha = 0.12;
+    ctx.translate(r.x + 3, r.y + 5);
+    ctx.rotate(r.angle);
+    ctx.rotate(Math.PI);
+    ctx.drawImage(r._shadowCanvas, -w / 2, -h / 2, w, h);
+    ctx.globalAlpha = 1;
+    ctx.restore();
+  }
 
   // Car
   ctx.save();
