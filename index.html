@@ -1422,8 +1422,6 @@ function updateRacer(r, dt, allRacers) {
       r.y = cp.y + cn.y * hw * sign;
       r.angle += correctionAngle * 0.3;
       r.speed *= 0.95;
-      r.damage = Math.min(1, (r.damage || 0) + 0.03);
-
       if (r.id === 0) {
         addSparks(r.x, r.y, 6);
         shakeCamera(4);
@@ -1795,8 +1793,6 @@ function updatePlayer(r, dt) {
     }
     addSparks(r.x, r.y, 3);
     shakeCamera(2);
-    r.damage = Math.min(1, (r.damage || 0) + 0.04);
-    addScratch(r);
   }
   // Safety: clamp position to sane range
   if (isNaN(r.x) || isNaN(r.y) || isNaN(r.angle) || isNaN(r.speed)) {
@@ -1830,11 +1826,6 @@ function updatePlayer(r, dt) {
       addSparks((r.x + other.x) / 2, (r.y + other.y) / 2, 4);
       shakeCamera(3);
       playCrash();
-      r.damage = Math.min(1, (r.damage || 0) + 0.06);
-      other.damage = Math.min(1, (other.damage || 0) + 0.06);
-      // Add dent at the impact point in car-local coordinates
-      var impactAngle = Math.atan2(ny, nx) - r.angle;
-
     }
   }
 
