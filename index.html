@@ -8,8 +8,51 @@
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { background: #111; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; font-family: 'Segoe UI', sans-serif; color: #fff; overflow: hidden; }
 
-canvas#c { border: 1px solid #333; position: relative; z-index: 0; }
-#gl-canvas { position: fixed; top: 0; left: 0; z-index: 1; pointer-events: none; border: none; }
+canvas#c { border: none; position: fixed; top: 0; left: 0; z-index: 0; opacity: 0; }
+#gl-canvas { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none; border: none; }
+
+/* CRT effects on everything - scanlines + vignette over full page */
+#crt-scanlines {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  pointer-events: none; z-index: 10000;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent 0px,
+    rgba(0,0,0,0.06) 1px,
+    transparent 2px,
+    transparent 3px
+  );
+}
+#crt-scanlines::after {
+  content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+  background: radial-gradient(ellipse at center,
+    transparent 50%,
+    rgba(0,0,0,0.2) 70%,
+    rgba(0,0,0,0.6) 100%
+  );
+}
+/* Bloom glow on ALL text and interactive elements */
+* {
+  --crt-glow: 0 0 4px currentColor;
+}
+h1, h2, h3, label, span, button, .pos-entry, #countdown, input {
+  text-shadow: 0 0 8px currentColor, 0 0 2px currentColor !important;
+}
+button {
+  box-shadow: 0 0 15px rgba(255,215,0,0.4), 0 0 30px rgba(255,215,0,0.15), inset 0 0 10px rgba(255,255,255,0.1) !important;
+}
+#main-menu h1 {
+  text-shadow: 0 0 25px currentColor, 0 0 50px currentColor, 0 0 100px rgba(255,215,0,0.3) !important;
+}
+#countdown {
+  text-shadow: 0 0 30px currentColor, 0 0 60px currentColor !important;
+}
+#ui, #lap-info {
+  box-shadow: 0 0 20px rgba(0,0,0,0.5);
+}
+.color-dot { box-shadow: 0 0 6px currentColor; }
+/* Warm tint on everything */
+body { filter: saturate(1.1) contrast(1.05); }
 #ui { position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,0.7); padding: 12px; border-radius: 8px; font-size: 14px; min-width: 180px; display: none; z-index: 2; }
 #ui h3 { margin-bottom: 8px; font-size: 16px; color: #ffd700; }
 .pos-entry { display: flex; align-items: center; gap: 6px; margin: 3px 0; }
@@ -217,6 +260,7 @@ button:hover { transform: scale(1.05); }
 <body>
 <canvas id="c"></canvas>
 <canvas id="gl-canvas"></canvas>
+<div id="crt-scanlines"></div>
 <div id="ui"><h3>Positions</h3><div id="positions"></div></div>
 <div id="lap-info">Lap <span id="lap-current">0</span> / <span id="lap-total">3</span></div>
 
@@ -380,9 +424,9 @@ function initCRT() {
     glCanvas.width = canvas.width;
     glCanvas.height = canvas.height;
     gl = glCanvas.getContext('webgl', { alpha: false, antialias: false, premultipliedAlpha: false });
-    if (!gl) { console.warn('WebGL not available, CRT disabled'); return; }
+    if (!gl) { console.warn('WebGL not available, CRT disabled'); canvas.style.opacity = '1'; return; }
 
-    const vsrc = `attribute vec2 a_pos;varying vec2 v_uv;void main(){v_uv=a_pos*0.5+0.5;gl_Position=vec4(a_pos,0,1);}`;
+    const vsrc = `attribute vec2 a_pos;varying vec2 v_uv;void main(){v_uv=vec2(a_pos.x*0.5+0.5, 0.5-a_pos.y*0.5);gl_Position=vec4(a_pos,0,1);}`;
     const fsrc = `
 precision mediump float;
 varying vec2 v_uv;
@@ -443,8 +487,8 @@ void main() {
   // Warm phosphor tint
   col *= vec3(1.05, 1.0, 0.92);
 
-  // Subtle flicker
-  float flicker = 1.0 - 0.015 * sin(u_time * 8.0 + uv.y * 2.0);
+  // Subtle flicker - whole screen, no per-pixel variation
+  float flicker = 1.0 - 0.01 * sin(u_time * 5.0);
   col *= flicker;
 
   gl_FragColor = vec4(col, 1.0);
