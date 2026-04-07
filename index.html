@@ -2569,6 +2569,12 @@ function showMultiplayerLobby() {
   document.getElementById('mp-error').textContent = '';
   document.getElementById('mp-waiting-panel').classList.remove('active');
   document.getElementById('mp-create-panel').classList.add('active');
+  // Pre-connect to server so create/join is instant
+  if (!ws || ws.readyState !== 1) {
+    connectToServer(MP_SERVER_URL).catch(function() {
+      document.getElementById('mp-error').textContent = 'Connecting to server...';
+    });
+  }
 }
 
 function mpSwitchTab(tab) {
@@ -2790,7 +2796,7 @@ function mpCreateRoom() {
   document.getElementById('mp-error').textContent = '';
   document.getElementById('mp-create-btn').disabled = true;
 
-  connectToServer(MP_SERVER_URL).then(function() {
+  function doCreate() {
     ws.send(JSON.stringify({
       type: 'create_room',
       username: username,
@@ -2799,10 +2805,16 @@ function mpCreateRoom() {
     }));
     selectedTrackLength = mpSelectedTrack;
     document.getElementById('mp-create-btn').disabled = false;
-  }).catch(function(err) {
-    document.getElementById('mp-error').textContent = 'Could not connect to server';
-    document.getElementById('mp-create-btn').disabled = false;
-  });
+  }
+
+  if (ws && ws.readyState === 1) {
+    doCreate();
+  } else {
+    connectToServer(MP_SERVER_URL).then(doCreate).catch(function() {
+      document.getElementById('mp-error').textContent = 'Could not connect to server';
+      document.getElementById('mp-create-btn').disabled = false;
+    });
+  }
 }
 
 function mpJoinRoom() {
@@ -2817,7 +2829,7 @@ function mpJoinRoom() {
   document.getElementById('mp-error').textContent = '';
   document.getElementById('mp-join-btn').disabled = true;
 
-  connectToServer(MP_SERVER_URL).then(function() {
+  function doJoin() {
     ws.send(JSON.stringify({
       type: 'join_room',
       roomCode: code,
@@ -2825,10 +2837,16 @@ function mpJoinRoom() {
       color: mpSelectedColor
     }));
     document.getElementById('mp-join-btn').disabled = false;
-  }).catch(function(err) {
-    document.getElementById('mp-error').textContent = 'Could not connect to server';
-    document.getElementById('mp-join-btn').disabled = false;
-  });
+  }
+
+  if (ws && ws.readyState === 1) {
+    doJoin();
+  } else {
+    connectToServer(MP_SERVER_URL).then(doJoin).catch(function() {
+      document.getElementById('mp-error').textContent = 'Could not connect to server';
+      document.getElementById('mp-join-btn').disabled = false;
+    });
+  }
 }
 
 function mpStartGame() {
