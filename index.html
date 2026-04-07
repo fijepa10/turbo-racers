@@ -6,23 +6,7 @@
 <style>
 @font-face { font-family: 'LedLight'; src: url('LEDLIGHT.otf') format('opentype'); }
 * { margin: 0; padding: 0; box-sizing: border-box; }
-html { overflow: hidden; }
-body {
-  background: #111; display: flex; flex-direction: column; align-items: center; justify-content: center;
-  font-family: 'Segoe UI', sans-serif; color: #fff; overflow: hidden;
-  width: 200vw; height: 200vh;
-  transform: scale(0.5);
-  transform-origin: top left;
-}
-/* Scale everything back up pixelated */
-html {
-  width: 50vw; height: 50vh;
-  transform: scale(2);
-  transform-origin: top left;
-  image-rendering: pixelated;
-  image-rendering: crisp-edges;
-  -webkit-font-smoothing: none;
-}
+body { background: #111; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; font-family: 'Segoe UI', sans-serif; color: #fff; overflow: hidden; }
 
 canvas#c {
   border: none;
