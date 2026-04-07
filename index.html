@@ -2719,6 +2719,7 @@ function mpHandleStateUpdate(remotePlayers) {
           target.targetY = rp.y;
           target.targetAngle = rp.angle;
           target.targetSpeed = rp.speed;
+          target.newData = true;
         }
         // Update lap/progress/boost directly from server
         if (rp.lap !== undefined) racers[ri].lap = rp.lap;
@@ -2737,45 +2738,44 @@ function mpInterpolateRemote(r, dt) {
   var target = mpRemotePlayers[r.mpId];
   if (!target) return;
 
-  // Snap quickly to server position - faster lerp prevents drifting off track
-  var dx = target.targetX - r.x;
-  var dy = target.targetY - r.y;
+  // Store previous and current server snapshots for smooth interpolation
+  if (target.newData) {
+    target.prevX = target.fromX !== undefined ? target.fromX : r.x;
+    target.prevY = target.fromY !== undefined ? target.fromY : r.y;
+    target.prevAngle = target.fromAngle !== undefined ? target.fromAngle : r.angle;
+    target.fromX = r.x;
+    target.fromY = r.y;
+    target.fromAngle = r.angle;
+    target.interpT = 0;
+    target.newData = false;
+  }
+
+  // Interpolate between current position and target over ~3 frames (50ms)
+  target.interpT = Math.min(1, (target.interpT || 0) + 0.15);
+  var t = target.interpT;
+  // Smooth step
+  t = t * t * (3 - 2 * t);
+
+  var dx = target.targetX - (target.fromX || r.x);
+  var dy = target.targetY - (target.fromY || r.y);
   var dist = Math.sqrt(dx * dx + dy * dy);
 
-  // If too far from target, snap immediately
-  if (dist > 100) {
+  if (dist > 150) {
+    // Too far - snap
     r.x = target.targetX;
     r.y = target.targetY;
     r.angle = target.targetAngle;
-    r.speed = target.targetSpeed;
   } else {
-    var lerpRate = 0.4; // fast interpolation
-    r.x += dx * lerpRate;
-    r.y += dy * lerpRate;
+    r.x = (target.fromX || r.x) + dx * t;
+    r.y = (target.fromY || r.y) + dy * t;
 
-    var angleDiff = target.targetAngle - r.angle;
+    var angleDiff = target.targetAngle - (target.fromAngle || r.angle);
     while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
     while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
-    r.angle += angleDiff * lerpRate;
-
-    r.speed += (target.targetSpeed - r.speed) * lerpRate;
+    r.angle = (target.fromAngle || r.angle) + angleDiff * t;
   }
 
-  // Clamp remote player to track bounds
-  if (track) {
-    var ci = closestCenterlineIndexNear(r.x, r.y, r.progress || 0);
-    var cp = track.centerline[ci];
-    var cn = track.normals[ci];
-    var toCar = { x: r.x - cp.x, y: r.y - cp.y };
-    var dotN = toCar.x * cn.x + toCar.y * cn.y;
-    var hw = TRACK_WIDTH / 2 - CAR_WIDTH;
-    if (Math.abs(dotN) > hw) {
-      var sign = dotN > 0 ? 1 : -1;
-      r.x = cp.x + cn.x * hw * sign;
-      r.y = cp.y + cn.y * hw * sign;
-    }
-    r.progress = ci;
-  }
+  r.speed = target.targetSpeed || r.speed;
 }
 
 // ---- Multiplayer Reset ----
