@@ -8,51 +8,24 @@
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { background: #111; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; font-family: 'Segoe UI', sans-serif; color: #fff; overflow: hidden; }
 
-canvas#c { border: none; position: fixed; top: 0; left: 0; z-index: 0; opacity: 0; }
-#gl-canvas { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none; border: none; }
+canvas#c { border: none; }
 
-/* CRT effects on everything - scanlines + vignette over full page */
-#crt-scanlines {
+/* CRT - applied to entire page via SVG filter */
+body { filter: url(#crt-filter) contrast(1.08) saturate(1.1); }
+
+/* Scanlines + vignette overlay on top of everything */
+#crt-overlay {
   position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-  pointer-events: none; z-index: 10000;
-  background: repeating-linear-gradient(
-    0deg,
-    transparent 0px,
-    rgba(0,0,0,0.06) 1px,
-    transparent 2px,
-    transparent 3px
-  );
+  pointer-events: none; z-index: 99999;
 }
-#crt-scanlines::after {
+#crt-overlay::before {
   content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-  background: radial-gradient(ellipse at center,
-    transparent 50%,
-    rgba(0,0,0,0.2) 70%,
-    rgba(0,0,0,0.6) 100%
-  );
+  background: repeating-linear-gradient(0deg, transparent 0px, rgba(0,0,0,0.07) 1px, transparent 2px, transparent 3px);
 }
-/* Bloom glow on ALL text and interactive elements */
-* {
-  --crt-glow: 0 0 4px currentColor;
+#crt-overlay::after {
+  content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+  background: radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.25) 75%, rgba(0,0,0,0.7) 100%);
 }
-h1, h2, h3, label, span, button, .pos-entry, #countdown, input {
-  text-shadow: 0 0 8px currentColor, 0 0 2px currentColor !important;
-}
-button {
-  box-shadow: 0 0 15px rgba(255,215,0,0.4), 0 0 30px rgba(255,215,0,0.15), inset 0 0 10px rgba(255,255,255,0.1) !important;
-}
-#main-menu h1 {
-  text-shadow: 0 0 25px currentColor, 0 0 50px currentColor, 0 0 100px rgba(255,215,0,0.3) !important;
-}
-#countdown {
-  text-shadow: 0 0 30px currentColor, 0 0 60px currentColor !important;
-}
-#ui, #lap-info {
-  box-shadow: 0 0 20px rgba(0,0,0,0.5);
-}
-.color-dot { box-shadow: 0 0 6px currentColor; }
-/* Warm tint on everything */
-body { filter: saturate(1.1) contrast(1.05); }
 #ui { position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,0.7); padding: 12px; border-radius: 8px; font-size: 14px; min-width: 180px; display: none; z-index: 2; }
 #ui h3 { margin-bottom: 8px; font-size: 16px; color: #ffd700; }
 .pos-entry { display: flex; align-items: center; gap: 6px; margin: 3px 0; }
@@ -258,9 +231,29 @@ button:hover { transform: scale(1.05); }
 </style>
 </head>
 <body>
+<!-- SVG filter for CRT barrel distortion + glow on EVERYTHING -->
+<svg xmlns="http://www.w3.org/2000/svg" style="position:absolute;width:0;height:0">
+  <defs>
+    <filter id="crt-filter" x="-5%" y="-5%" width="110%" height="110%">
+      <!-- Barrel distortion via displacement map -->
+      <feImage href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cdefs%3E%3CradialGradient id='g'%3E%3Cstop offset='0%25' stop-color='%23808080'/%3E%3Cstop offset='100%25' stop-color='%23606060'/%3E%3C/radialGradient%3E%3C/defs%3E%3Crect fill='%23808080' width='200' height='200'/%3E%3Ccircle cx='100' cy='100' r='100' fill='url(%23g)'/%3E%3C/svg%3E" result="dispMap" x="0%" y="0%" width="100%" height="100%"/>
+      <feDisplacementMap in="SourceGraphic" in2="dispMap" scale="25" xChannelSelector="R" yChannelSelector="G" result="distorted"/>
+      <!-- Bloom/glow: blur a copy and merge -->
+      <feGaussianBlur in="distorted" stdDeviation="3" result="blurred"/>
+      <feComponentTransfer in="blurred" result="brightBlur">
+        <feFuncR type="linear" slope="1.5" intercept="-0.15"/>
+        <feFuncG type="linear" slope="1.5" intercept="-0.15"/>
+        <feFuncB type="linear" slope="1.5" intercept="-0.15"/>
+      </feComponentTransfer>
+      <feMerge>
+        <feMergeNode in="distorted"/>
+        <feMergeNode in="brightBlur"/>
+      </feMerge>
+    </filter>
+  </defs>
+</svg>
+<div id="crt-overlay"></div>
 <canvas id="c"></canvas>
-<canvas id="gl-canvas"></canvas>
-<div id="crt-scanlines"></div>
 <div id="ui"><h3>Positions</h3><div id="positions"></div></div>
 <div id="lap-info">Lap <span id="lap-current">0</span> / <span id="lap-total">3</span></div>
 
@@ -414,159 +407,7 @@ const ctx = canvas.getContext('2d');
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
-// ---- CRT Post-Processing ----
-let glCanvas, gl, crtProgram, crtTex, crtVB, crtTimeLoc, crtResLoc, crtEnabled = false;
 
-function initCRT() {
-  try {
-    glCanvas = document.getElementById('gl-canvas');
-    if (!glCanvas) return;
-    glCanvas.width = canvas.width;
-    glCanvas.height = canvas.height;
-    gl = glCanvas.getContext('webgl', { alpha: false, antialias: false, premultipliedAlpha: false });
-    if (!gl) { console.warn('WebGL not available, CRT disabled'); canvas.style.opacity = '1'; return; }
-
-    const vsrc = `attribute vec2 a_pos;varying vec2 v_uv;void main(){v_uv=vec2(a_pos.x*0.5+0.5, 0.5-a_pos.y*0.5);gl_Position=vec4(a_pos,0,1);}`;
-    const fsrc = `
-precision mediump float;
-varying vec2 v_uv;
-uniform sampler2D u_tex;
-uniform float u_time;
-uniform vec2 u_res;
-
-vec2 barrelDistort(vec2 uv, float amt) {
-  vec2 cc = uv - 0.5;
-  float dist = dot(cc, cc);
-  return uv + cc * dist * amt;
-}
-
-void main() {
-  float distStr = 0.15;
-  vec2 uv = barrelDistort(v_uv, distStr);
-
-  // Out-of-bounds check
-  if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) {
-    gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
-    return;
-  }
-
-  // Chromatic aberration - increases toward edges
-  vec2 center = uv - 0.5;
-  float edgeDist = dot(center, center);
-  float caStr = 0.003 + edgeDist * 0.012;
-  vec2 caDir = normalize(center + 0.0001) * caStr;
-  float r = texture2D(u_tex, barrelDistort(v_uv + caDir, distStr)).r;
-  float g = texture2D(u_tex, uv).g;
-  float b = texture2D(u_tex, barrelDistort(v_uv - caDir, distStr)).b;
-  vec3 col = vec3(r, g, b);
-
-  // Bloom - sample blurred neighbors
-  vec3 bloom = vec3(0.0);
-  float bSize = 3.0;
-  for (float i = -2.0; i <= 2.0; i += 1.0) {
-    for (float j = -2.0; j <= 2.0; j += 1.0) {
-      vec2 off = vec2(i, j) * bSize / u_res;
-      bloom += texture2D(u_tex, uv + off).rgb;
-    }
-  }
-  bloom /= 25.0;
-  // Only add bloom from bright areas
-  vec3 brightPass = max(bloom - 0.5, 0.0) * 2.0;
-  col += brightPass * 0.3;
-
-  // Scanlines
-  float scanline = sin(uv.y * u_res.y * 3.14159) * 0.5 + 0.5;
-  col *= 0.92 + 0.08 * scanline;
-
-  // Vignette
-  float vig = 1.0 - edgeDist * 1.8;
-  vig = clamp(vig, 0.0, 1.0);
-  vig = sqrt(vig);
-  col *= vig;
-
-  // Warm phosphor tint
-  col *= vec3(1.05, 1.0, 0.92);
-
-  // Subtle flicker - whole screen, no per-pixel variation
-  float flicker = 1.0 - 0.01 * sin(u_time * 5.0);
-  col *= flicker;
-
-  gl_FragColor = vec4(col, 1.0);
-}`;
-
-    function compileShader(src, type) {
-      var s = gl.createShader(type);
-      gl.shaderSource(s, src);
-      gl.compileShader(s);
-      if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
-        console.error('Shader error:', gl.getShaderInfoLog(s));
-        return null;
-      }
-      return s;
-    }
-    var vs = compileShader(vsrc, gl.VERTEX_SHADER);
-    var fs = compileShader(fsrc, gl.FRAGMENT_SHADER);
-    if (!vs || !fs) return;
-
-    crtProgram = gl.createProgram();
-    gl.attachShader(crtProgram, vs);
-    gl.attachShader(crtProgram, fs);
-    gl.linkProgram(crtProgram);
-    if (!gl.getProgramParameter(crtProgram, gl.LINK_STATUS)) {
-      console.error('Program link error:', gl.getProgramInfoLog(crtProgram));
-      return;
-    }
-    gl.useProgram(crtProgram);
-
-    crtTimeLoc = gl.getUniformLocation(crtProgram, 'u_time');
-    crtResLoc = gl.getUniformLocation(crtProgram, 'u_res');
-    var texLoc = gl.getUniformLocation(crtProgram, 'u_tex');
-    gl.uniform1i(texLoc, 0);
-
-    // Full-screen quad
-    crtVB = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, crtVB);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
-    var posLoc = gl.getAttribLocation(crtProgram, 'a_pos');
-    gl.enableVertexAttribArray(posLoc);
-    gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
-
-    // Texture for game canvas
-    crtTex = gl.createTexture();
-    gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, crtTex);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-
-    crtEnabled = true;
-    glCanvas.style.display = 'block';
-  } catch (e) {
-    console.warn('CRT init failed:', e);
-    crtEnabled = false;
-  }
-}
-
-function renderCRT(time) {
-  if (!crtEnabled) return;
-  gl.viewport(0, 0, glCanvas.width, glCanvas.height);
-  gl.activeTexture(gl.TEXTURE0);
-  gl.bindTexture(gl.TEXTURE_2D, crtTex);
-  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, canvas);
-  gl.useProgram(crtProgram);
-  gl.uniform1f(crtTimeLoc, (time || 0) * 0.001);
-  gl.uniform2f(crtResLoc, glCanvas.width, glCanvas.height);
-  gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-}
-
-function resizeCRT() {
-  if (!glCanvas) return;
-  glCanvas.width = canvas.width;
-  glCanvas.height = canvas.height;
-}
-
-initCRT();
 
 const TOTAL_LAPS = 3;
 const TRACK_WIDTH = 90;
@@ -1471,7 +1312,7 @@ function updateRacer(r, dt, allRacers) {
   }
 
   const movedDist = Math.sqrt((r.x - r.lastX) ** 2 + (r.y - r.lastY) ** 2);
-  if (r.speed > 1 && movedDist < 0.5) {
+  if (movedDist < 0.5) {
     r.stuckTimer += dt;
   } else {
     r.stuckTimer = Math.max(0, r.stuckTimer - dt * 2);
@@ -1479,14 +1320,14 @@ function updateRacer(r, dt, allRacers) {
   r.lastX = r.x;
   r.lastY = r.y;
 
-  if (r.stuckTimer > 3000) {
+  if (r.stuckTimer > 5000) {
     const ci = closestCenterlineIndex(r.x, r.y);
     const ahead = (ci + 5) % track.centerline.length;
     r.x = track.centerline[ahead].x;
     r.y = track.centerline[ahead].y;
     const next = track.centerline[(ahead + 3) % track.centerline.length];
     r.angle = Math.atan2(next.y - r.y, next.x - r.x);
-    r.speed = 2;
+    r.speed = r.maxSpeed * 0.8;
     r.stuckTimer = 0;
     r.progress = ahead;
     return;
@@ -1864,21 +1705,21 @@ function updatePlayer(r, dt) {
 
   // Stuck detection for player - only after they've started moving
   const pMovedDist = Math.sqrt((r.x - r.lastX) ** 2 + (r.y - r.lastY) ** 2);
-  if (r.speed > 1 && pMovedDist < 0.5) {
+  if (pMovedDist < 0.5) {
     r.stuckTimer += dt;
   } else {
     r.stuckTimer = Math.max(0, r.stuckTimer - dt * 2);
   }
   r.lastX = r.x;
   r.lastY = r.y;
-  if (r.stuckTimer > 3000) {
+  if (r.stuckTimer > 5000) {
     const ci = closestCenterlineIndex(r.x, r.y);
     const ahead = (ci + 10) % track.centerline.length;
     r.x = track.centerline[ahead].x;
     r.y = track.centerline[ahead].y;
     const next = track.centerline[(ahead + 3) % track.centerline.length];
     r.angle = Math.atan2(next.y - r.y, next.x - r.x);
-    r.speed = 2;
+    r.speed = r.maxSpeed * 0.8;
     r.stuckTimer = 0;
     r.progress = ahead;
     return;
