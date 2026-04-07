@@ -8,18 +8,12 @@
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { background: #111; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; font-family: 'Segoe UI', sans-serif; color: #fff; overflow: hidden; }
 
-canvas#c {
-  border: none;
-  image-rendering: pixelated;
-  image-rendering: crisp-edges;
-  position: fixed; top: 0; left: 0;
-  width: 100vw; height: 100vh;
-}
-#ui { position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,0.7); padding: 12px; border-radius: 8px; font-size: 14px; min-width: 180px; display: none !important; z-index: 2; }
+canvas#c { border: none; }
+#ui { position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,0.7); padding: 12px; border-radius: 8px; font-size: 14px; min-width: 180px; display: none; z-index: 2; }
 #ui h3 { margin-bottom: 8px; font-size: 16px; color: #ffd700; }
 .pos-entry { display: flex; align-items: center; gap: 6px; margin: 3px 0; }
 .color-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
-#lap-info { position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.7); padding: 12px; border-radius: 8px; font-size: 14px; display: none !important; z-index: 2; }
+#lap-info { position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.7); padding: 12px; border-radius: 8px; font-size: 14px; display: none; z-index: 2; }
 #countdown { position: absolute; font-size: 120px; font-weight: bold; color: #ffd700; text-shadow: 0 0 40px rgba(255,215,0,0.6); z-index: 5; display: none; }
 #finish-screen { position: absolute; display: none; flex-direction: column; align-items: center; gap: 16px; background: rgba(0,0,0,0.85); padding: 40px; border-radius: 16px; z-index: 10; }
 #finish-screen h2 { font-size: 36px; color: #ffd700; }
@@ -369,12 +363,10 @@ button:hover { transform: scale(1.05); }
 </div>
 
 <script>
-const PIXEL_DIV = 4;
 const canvas = document.getElementById('c');
 const ctx = canvas.getContext('2d');
-ctx.imageSmoothingEnabled = false;
-canvas.width = Math.floor(window.innerWidth / PIXEL_DIV);
-canvas.height = Math.floor(window.innerHeight / PIXEL_DIV);
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
 
 
 
@@ -1575,13 +1567,7 @@ function drawCar(r) {
     ctx.rotate(Math.PI);
     const h = CAR_LENGTH;
     const w = h * (sprite.width / sprite.height);
-    // Crop source to skip the drop shadow border (10% on each side)
-    const crop = 0.1;
-    const sx = sprite.width * crop;
-    const sy = sprite.height * crop;
-    const sw = sprite.width * (1 - crop * 2);
-    const sh = sprite.height * (1 - crop * 2);
-    ctx.drawImage(sprite, sx, sy, sw, sh, -w / 2, -h / 2, w, h);
+    ctx.drawImage(sprite, -w / 2, -h / 2, w, h);
   } else {
     ctx.fillStyle = r.color;
     ctx.beginPath();
@@ -1856,7 +1842,7 @@ function updateCamera() {
   camera.x += (targetX - camera.x) * 0.08;
   camera.y += (targetY - camera.y) * 0.08;
 
-  const targetZoom = (player && player.boostTimer > 0) ? 0.5 : 0.7;
+  const targetZoom = (player && player.boostTimer > 0) ? 2.0 : 2.5;
   camera.zoom += (targetZoom - camera.zoom) * 0.03;
 }
 
@@ -1869,91 +1855,28 @@ function updateUI() {
     return b.totalProgress - a.totalProgress;
   });
 
-  drawHUD(sorted);
-}
+  const posDiv = document.getElementById('positions');
+  posDiv.innerHTML = sorted.map((r, i) => {
+    const lapDisplay = Math.min(r.lap, TOTAL_LAPS);
+    const status = r.finished ? ' (FINISHED)' : '';
+    return `<div class="pos-entry">
+      <span style="color:#aaa;width:16px">${i + 1}.</span>
+      <span class="color-dot" style="background:${r.color}"></span>
+      <span style="color:${r.color}">${r.name}</span>
+      <span style="color:#666;margin-left:auto">L${lapDisplay}${status}</span>
+    </div>`;
+  }).join('');
 
-function drawHUD(sorted) {
-  ctx.save();
+  const leader = sorted[0];
+  document.getElementById('lap-current').textContent = Math.min(leader ? leader.lap + 1 : 1, TOTAL_LAPS);
+  document.getElementById('lap-total').textContent = TOTAL_LAPS;
 
-  // ---- Positions list (top-left) ----
-  const px = 4;
-  var py = 4;
-  const lineH = 8;
-  const fontSize = 5;
-
-  // Background box
-  const boxW = 55;
-  const boxH = 10 + sorted.length * lineH;
-  ctx.fillStyle = 'rgba(0,0,0,0.65)';
-  ctx.fillRect(px - 2, py - 2, boxW, boxH);
-
-  // Header
-  ctx.font = 'bold ' + fontSize + 'px monospace';
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'top';
-  ctx.fillStyle = '#ffd700';
-  ctx.fillText('Positions', px + 1, py);
-  py += lineH + 1;
-
-  // Entries
-  ctx.font = fontSize + 'px monospace';
-  for (var i = 0; i < sorted.length; i++) {
-    var r = sorted[i];
-    var lapDisplay = Math.min(r.lap, TOTAL_LAPS);
-    var status = r.finished ? '*' : '';
-
-    // Rank number
-    ctx.fillStyle = '#aaa';
-    ctx.fillText((i + 1) + '.', px + 1, py);
-
-    // Color square
-    ctx.fillStyle = r.color;
-    ctx.fillRect(px + 12, py + 1, 5, 5);
-
-    // Name
-    ctx.fillStyle = r.color;
-    ctx.fillText(r.name, px + 19, py);
-
-    // Lap
-    ctx.fillStyle = '#666';
-    ctx.textAlign = 'right';
-    ctx.fillText('L' + lapDisplay + status, px + boxW - 4, py);
-    ctx.textAlign = 'left';
-
-    py += lineH;
-  }
-
-  // ---- Lap info (top-right) ----
   if (player && track) {
-    var leader = sorted[0];
-    var currentLap = Math.min(leader ? leader.lap + 1 : 1, TOTAL_LAPS);
-    var cl = track.centerline.length;
-    var pct = Math.max(0, Math.min(100, (player.totalProgress / (cl * TOTAL_LAPS)) * 100)).toFixed(1);
-
-    var rx = canvas.width - 4;
-    var ry = 4;
-
-    // Background box
-    var lapBoxW = 40;
-    var lapBoxH = 20;
-    ctx.fillStyle = 'rgba(0,0,0,0.65)';
-    ctx.fillRect(rx - lapBoxW, ry - 2, lapBoxW + 2, lapBoxH);
-
-    ctx.textAlign = 'right';
-    ctx.textBaseline = 'top';
-
-    // Lap line
-    ctx.font = 'bold ' + fontSize + 'px monospace';
-    ctx.fillStyle = '#fff';
-    ctx.fillText('LAP ' + currentLap + '/' + TOTAL_LAPS, rx, ry);
-
-    // Percentage
-    ctx.font = fontSize + 'px monospace';
-    ctx.fillStyle = '#aaa';
-    ctx.fillText('Race: ' + pct + '%', rx, ry + lineH);
+    const cl = track.centerline.length;
+    const pct = Math.max(0, Math.min(100, (player.totalProgress / (cl * TOTAL_LAPS)) * 100)).toFixed(1);
+    const lapInfo = document.getElementById('lap-info');
+    lapInfo.innerHTML = `Lap <span id="lap-current">${Math.min(leader ? leader.lap + 1 : 1, TOTAL_LAPS)}</span> / <span id="lap-total">${TOTAL_LAPS}</span><br><span style="color:#aaa;font-size:12px">Race: ${pct}%</span>`;
   }
-
-  ctx.restore();
 }
 
 // ---- Speedometer Gauge ----
@@ -1962,32 +1885,86 @@ function drawSpeedometer() {
   if (!player) return;
   const mph = Math.round(player.speed * 20);
   const maxMPH = 200;
-  const r = 12;
-  const cx = 5 + r;
-  const cy = canvas.height - 18;
+  const radius = 120;
+  const cx = 40 + radius;
+  const cy = canvas.height - 40;
+  const startAngle = Math.PI;
+  const endAngle = Math.PI * 2;
 
   ctx.save();
 
-  // Background
-  ctx.fillStyle = 'rgba(0,0,0,0.7)';
-  ctx.fillRect(cx - r - 3, cy - r - 3, r * 2 + 6, r + 14);
+  ctx.beginPath();
+  ctx.arc(cx, cy, radius + 10, startAngle, endAngle, false);
+  ctx.lineTo(cx + radius + 10, cy + 6);
+  ctx.lineTo(cx - radius - 10, cy + 6);
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(0,0,0,0.75)';
+  ctx.fill();
 
-  // Speed bar
-  const barW = r * 2;
-  const barH = 3;
-  const barX = cx - r;
-  const barY = cy - 2;
-  ctx.fillStyle = '#333';
-  ctx.fillRect(barX, barY, barW, barH);
-  const frac = Math.min(mph / maxMPH, 1);
-  ctx.fillStyle = frac < 0.5 ? '#4f4' : frac < 0.8 ? '#ff0' : '#f22';
-  ctx.fillRect(barX, barY, barW * frac, barH);
+  ctx.beginPath();
+  ctx.arc(cx, cy, radius, startAngle, endAngle, false);
+  ctx.strokeStyle = '#444';
+  ctx.lineWidth = 8;
+  ctx.stroke();
 
-  // MPH text
-  ctx.font = '5px monospace';
-  ctx.fillStyle = '#fff';
+  const speedFraction = Math.min(mph / maxMPH, 1);
+  const needleAngle = startAngle + speedFraction * (endAngle - startAngle);
+  if (speedFraction > 0) {
+    ctx.beginPath();
+    ctx.arc(cx, cy, radius, startAngle, needleAngle, false);
+    const grad = ctx.createLinearGradient(cx - radius, cy, cx + radius, cy);
+    grad.addColorStop(0, '#44ff44');
+    grad.addColorStop(0.5, '#ffdd00');
+    grad.addColorStop(1, '#ff2222');
+    ctx.strokeStyle = grad;
+    ctx.lineWidth = 8;
+    ctx.stroke();
+  }
+
+  const marks = [0, 50, 100, 150, 200];
+  ctx.fillStyle = '#ccc';
+  ctx.font = '11px sans-serif';
   ctx.textAlign = 'center';
-  ctx.fillText(mph + ' MPH', cx, cy + 7);
+  ctx.textBaseline = 'middle';
+  for (const m of marks) {
+    const frac = m / maxMPH;
+    const a = startAngle + frac * (endAngle - startAngle);
+    const innerR = radius - 12;
+    const outerR = radius - 2;
+    ctx.beginPath();
+    ctx.moveTo(cx + Math.cos(a) * innerR, cy + Math.sin(a) * innerR);
+    ctx.lineTo(cx + Math.cos(a) * outerR, cy + Math.sin(a) * outerR);
+    ctx.strokeStyle = '#aaa';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    const labelR = radius - 24;
+    ctx.fillText(m, cx + Math.cos(a) * labelR, cy + Math.sin(a) * labelR);
+  }
+
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(needleAngle);
+  ctx.beginPath();
+  ctx.moveTo(radius - 18, 0);
+  ctx.lineTo(-12, -3);
+  ctx.lineTo(-12, 3);
+  ctx.closePath();
+  ctx.fillStyle = '#ff2222';
+  ctx.fill();
+  ctx.restore();
+
+  ctx.beginPath();
+  ctx.arc(cx, cy, 6, 0, Math.PI * 2);
+  ctx.fillStyle = '#cc0000';
+  ctx.fill();
+
+  ctx.font = 'bold 22px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#fff';
+  ctx.fillText(mph, cx, cy + 20);
+  ctx.font = '10px sans-serif';
+  ctx.fillStyle = '#888';
+  ctx.fillText('MPH', cx, cy + 34);
 
   ctx.restore();
 }
@@ -2273,9 +2250,8 @@ function resetRace() {
 
 // Handle resize
 window.addEventListener('resize', () => {
-  canvas.width = Math.floor(window.innerWidth / PIXEL_DIV);
-  canvas.height = Math.floor(window.innerHeight / PIXEL_DIV);
-  ctx.imageSmoothingEnabled = false;
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
 });
 
 requestAnimationFrame(gameLoop);
@@ -2807,8 +2783,8 @@ function teOpen() {
   tePanX = 0; tePanY = 0; teZoom = 0.4;
   teMyTrackPoints = null;
   teCanvas = document.getElementById('track-editor-canvas');
-  teCanvas.width = Math.floor(window.innerWidth / PIXEL_DIV);
-  teCanvas.height = Math.floor(window.innerHeight / PIXEL_DIV);
+  teCanvas.width = window.innerWidth;
+  teCanvas.height = window.innerHeight;
   teCtx = teCanvas.getContext('2d');
   // Center pan so 0,0 is in the middle
   tePanX = -teCanvas.width / 2;
@@ -2830,8 +2806,8 @@ function teOpen() {
 
 function teResize() {
   if (!teCanvas) return;
-  teCanvas.width = Math.floor(window.innerWidth / PIXEL_DIV);
-  teCanvas.height = Math.floor(window.innerHeight / PIXEL_DIV);
+  teCanvas.width = window.innerWidth;
+  teCanvas.height = window.innerHeight;
   teDraw();
 }
 
