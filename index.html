@@ -1520,30 +1520,30 @@ function drawTrack() {
   ctx.stroke();
   ctx.setLineDash([]);
 
-  // Start/finish line
+  // Start/finish line - checkerboard pattern aligned to track direction
   const sp = track.centerline[0];
   const sn = track.normals[0];
   const hw = TRACK_WIDTH / 2;
-  ctx.beginPath();
-  ctx.moveTo(sp.x + sn.x * hw, sp.y + sn.y * hw);
-  ctx.lineTo(sp.x - sn.x * hw, sp.y - sn.y * hw);
-  ctx.strokeStyle = '#fff';
-  ctx.lineWidth = 4;
-  ctx.stroke();
+  const trackDir = { x: -sn.y, y: sn.x }; // direction along the track
+  const numSquares = 8;
+  const squareSize = TRACK_WIDTH / numSquares;
+  const rows = 3;
 
-  // Checkerboard pattern on start line
-  const startDir = { x: -sn.y, y: sn.x };
-  for (let i = 0; i < 8; i++) {
-    for (let j = 0; j < 2; j++) {
-      if ((i + j) % 2 === 0) {
-        const size = TRACK_WIDTH / 8;
-        const bx = sp.x - sn.x * hw + sn.x * i * size + startDir.x * j * size;
-        const by = sp.y - sn.y * hw + sn.y * i * size + startDir.y * j * size;
-        ctx.fillStyle = '#fff';
-        ctx.fillRect(bx - size / 2, by - size / 2, size, size);
-      }
+  ctx.save();
+  ctx.translate(sp.x, sp.y);
+  ctx.rotate(Math.atan2(sn.y, sn.x));
+
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < numSquares; col++) {
+      ctx.fillStyle = (row + col) % 2 === 0 ? '#fff' : '#222';
+      ctx.fillRect(
+        -hw + col * squareSize,
+        -squareSize * rows / 2 + row * squareSize,
+        squareSize, squareSize
+      );
     }
   }
+  ctx.restore();
 
   // Tire marks (under cars)
   drawParticles();
