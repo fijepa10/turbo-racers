@@ -1574,21 +1574,22 @@ function addDent(car, worldX, worldY) {
   // Rotate into car space (car faces right at angle 0)
   var lx = dx * cos - dy * sin;
   var ly = dx * sin + dy * cos;
-  // Flip because sprite is drawn rotated 180
-  lx = -lx;
-  ly = -ly;
+  // Flip because sprite is drawn rotated 180, add jitter so dents don't stack
+  lx = -lx + (Math.random() - 0.5) * 4;
+  ly = -ly + (Math.random() - 0.5) * 4;
   car.dents.push({ lx: lx, ly: ly, strength: 0.5 + Math.random() * 0.5 });
 }
 
 function drawCarMesh(ctx, sprite, x, y, w, h, dents, isPlayer) {
-  var cols = 10, rows = 10;
+  var cols = isPlayer ? 10 : 8;
+  var rows = isPlayer ? 10 : 8;
   var cellW = w / cols, cellH = h / rows;
   var sw = sprite.width / cols, sh = sprite.height / rows;
   var centerX = x + w / 2, centerY = y + h / 2;
   var dentRadius = 12;
 
   // Pre-check: which cells are on the edge (can be dented)
-  var edgeBorder = 2; // cells from edge that can deform
+  var edgeBorder = 3; // cells from edge that can deform
   for (var row = 0; row < rows; row++) {
     for (var col = 0; col < cols; col++) {
       var gx = x + col * cellW;
@@ -1874,7 +1875,10 @@ function updatePlayer(r, dt) {
     }
     addSparks(r.x, r.y, 3);
     shakeCamera(2);
-    addDent(r, r.x, r.y);
+    // Dent at the wall contact point (edge of car toward the wall)
+    var wallHitX = r.x + cn.x * sign * (TRACK_WIDTH / 2 - CAR_WIDTH);
+    var wallHitY = r.y + cn.y * sign * (TRACK_WIDTH / 2 - CAR_WIDTH);
+    addDent(r, wallHitX, wallHitY);
   }
   // Safety: clamp position to sane range
   if (isNaN(r.x) || isNaN(r.y) || isNaN(r.angle) || isNaN(r.speed)) {
