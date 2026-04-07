@@ -254,7 +254,7 @@ button:hover { transform: scale(1.05); }
   <button class="menu-btn secondary" onclick="showSettingsScreen()">SETTINGS</button>
   <p class="coming-soon-tooltip" id="coming-soon-msg">COMING SOON</p>
   <p style="color:#555;font-size:12px;margin-top:8px">Arrow keys or WASD to drive</p>
-  <p id="version-text" style="color:#333;font-size:10px;margin-top:12px">v1.2.0</p>
+  <p id="version-text" style="color:#333;font-size:10px;margin-top:12px">v1.3.0</p>
 </div>
 
 <!-- Single Player Setup -->
@@ -3063,16 +3063,40 @@ function mpInterpolateRemote(r, dt) {
   if (!target) return;
 
   if (target.newData) {
-    // Server update arrived - snap to authoritative position
-    r.x = target.targetX;
-    r.y = target.targetY;
-    r.angle = target.targetAngle;
+    // Server update - calculate correction needed
+    target.errorX = target.targetX - r.x;
+    target.errorY = target.targetY - r.y;
+    var ad = target.targetAngle - r.angle;
+    while (ad > Math.PI) ad -= Math.PI * 2;
+    while (ad < -Math.PI) ad += Math.PI * 2;
+    target.errorAngle = ad;
     r.speed = target.targetSpeed;
+    // If way off, just snap
+    var errDist = Math.sqrt(target.errorX * target.errorX + target.errorY * target.errorY);
+    if (errDist > 100) {
+      r.x = target.targetX;
+      r.y = target.targetY;
+      r.angle = target.targetAngle;
+      target.errorX = 0;
+      target.errorY = 0;
+      target.errorAngle = 0;
+    }
     target.newData = false;
-  } else {
-    // Dead reckon between server updates using last known velocity
-    r.x += Math.cos(r.angle) * r.speed;
-    r.y += Math.sin(r.angle) * r.speed;
+  }
+
+  // Dead reckon forward
+  r.x += Math.cos(r.angle) * r.speed;
+  r.y += Math.sin(r.angle) * r.speed;
+
+  // Gradually apply correction (spread over ~3 frames)
+  if (target.errorX || target.errorY || target.errorAngle) {
+    var blend = 0.4;
+    r.x += (target.errorX || 0) * blend;
+    r.y += (target.errorY || 0) * blend;
+    r.angle += (target.errorAngle || 0) * blend;
+    target.errorX *= (1 - blend);
+    target.errorY *= (1 - blend);
+    target.errorAngle *= (1 - blend);
   }
 }
 
