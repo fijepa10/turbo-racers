@@ -254,7 +254,7 @@ button:hover { transform: scale(1.05); }
   <button class="menu-btn secondary" onclick="showSettingsScreen()">SETTINGS</button>
   <p class="coming-soon-tooltip" id="coming-soon-msg">COMING SOON</p>
   <p style="color:#555;font-size:12px;margin-top:8px">Arrow keys or WASD to drive</p>
-  <p id="version-text" style="color:#333;font-size:10px;margin-top:12px">v1.5.0</p>
+  <p id="version-text" style="color:#333;font-size:10px;margin-top:12px">v1.6.0</p>
 </div>
 
 <!-- Single Player Setup -->
@@ -2266,9 +2266,18 @@ function gameLoop(time) {
               finishOrder.push(r);
             }
           } else if (isMultiplayer && !mpIsHost && !r._isRemoteHuman) {
-            // Non-host: AI bots just dead-reckon, host sends real positions
+            // Non-host: AI bots dead-reckon + smooth error correction
             r.x += Math.cos(r.angle) * r.speed;
             r.y += Math.sin(r.angle) * r.speed;
+            if (r._aiError) {
+              var bl = 0.35;
+              r.x += r._aiError.x * bl;
+              r.y += r._aiError.y * bl;
+              r.angle += r._aiError.a * bl;
+              r._aiError.x *= (1 - bl);
+              r._aiError.y *= (1 - bl);
+              r._aiError.a *= (1 - bl);
+            }
           } else {
             updateRacer(r, dt, allCars);
           }
@@ -2789,18 +2798,30 @@ function mpHandleMessage(msg) {
 
     case 'state':
       mpHandleStateUpdate(msg.players);
-      // Non-host clients apply host's AI positions
+      // Non-host clients: smooth-correct AI positions from host
       if (!mpIsHost && msg.ai && racers) {
         for (var ai = 0; ai < msg.ai.length; ai++) {
           var ad = msg.ai[ai];
           if (ad.idx >= 0 && ad.idx < racers.length && !racers[ad.idx]._isRemoteHuman) {
-            racers[ad.idx].x = ad.x;
-            racers[ad.idx].y = ad.y;
-            racers[ad.idx].angle = ad.angle;
-            racers[ad.idx].speed = ad.speed;
-            racers[ad.idx].lap = ad.lap;
-            racers[ad.idx].totalProgress = ad.totalProgress;
-            racers[ad.idx].progress = ad.progress;
+            var bot = racers[ad.idx];
+            // Store error for gradual correction (same as remote humans)
+            if (!bot._aiError) bot._aiError = { x: 0, y: 0, a: 0 };
+            bot._aiError.x = ad.x - bot.x;
+            bot._aiError.y = ad.y - bot.y;
+            var aDiff = ad.angle - bot.angle;
+            while (aDiff > Math.PI) aDiff -= Math.PI * 2;
+            while (aDiff < -Math.PI) aDiff += Math.PI * 2;
+            bot._aiError.a = aDiff;
+            bot.speed = ad.speed;
+            bot.lap = ad.lap;
+            bot.totalProgress = ad.totalProgress;
+            bot.progress = ad.progress;
+            // Snap if way off
+            var errD = Math.sqrt(bot._aiError.x * bot._aiError.x + bot._aiError.y * bot._aiError.y);
+            if (errD > 80) {
+              bot.x = ad.x; bot.y = ad.y; bot.angle = ad.angle;
+              bot._aiError.x = 0; bot._aiError.y = 0; bot._aiError.a = 0;
+            }
           }
         }
       }
