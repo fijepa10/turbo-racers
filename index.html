@@ -1423,7 +1423,7 @@ function updateRacer(r, dt, allRacers) {
       r.angle += correctionAngle * 0.3;
       r.speed *= 0.95;
       r.damage = Math.min(1, (r.damage || 0) + 0.03);
-      addScratch(r);
+
       if (r.id === 0) {
         addSparks(r.x, r.y, 6);
         shakeCamera(4);
@@ -1834,8 +1834,7 @@ function updatePlayer(r, dt) {
       other.damage = Math.min(1, (other.damage || 0) + 0.06);
       // Add dent at the impact point in car-local coordinates
       var impactAngle = Math.atan2(ny, nx) - r.angle;
-      addScratch(r, impactAngle);
-      addScratch(other, impactAngle + Math.PI);
+
     }
   }
 
@@ -2776,44 +2775,27 @@ function mpInterpolateRemote(r, dt) {
   var target = mpRemotePlayers[r.mpId];
   if (!target) return;
 
-  // Store previous and current server snapshots for smooth interpolation
-  if (target.newData) {
-    target.prevX = target.fromX !== undefined ? target.fromX : r.x;
-    target.prevY = target.fromY !== undefined ? target.fromY : r.y;
-    target.prevAngle = target.fromAngle !== undefined ? target.fromAngle : r.angle;
-    target.fromX = r.x;
-    target.fromY = r.y;
-    target.fromAngle = r.angle;
-    target.interpT = 0;
-    target.newData = false;
-  }
-
-  // Interpolate between current position and target over ~3 frames (50ms)
-  target.interpT = Math.min(1, (target.interpT || 0) + 0.15);
-  var t = target.interpT;
-  // Smooth step
-  t = t * t * (3 - 2 * t);
-
-  var dx = target.targetX - (target.fromX || r.x);
-  var dy = target.targetY - (target.fromY || r.y);
+  // Simple direct lerp toward server position
+  var dx = target.targetX - r.x;
+  var dy = target.targetY - r.y;
   var dist = Math.sqrt(dx * dx + dy * dy);
 
-  if (dist > 150) {
-    // Too far - snap
+  if (dist > 200 || isNaN(r.x) || isNaN(r.y)) {
+    // Snap if too far or corrupted
     r.x = target.targetX;
     r.y = target.targetY;
     r.angle = target.targetAngle;
+    r.speed = target.targetSpeed;
   } else {
-    r.x = (target.fromX || r.x) + dx * t;
-    r.y = (target.fromY || r.y) + dy * t;
-
-    var angleDiff = target.targetAngle - (target.fromAngle || r.angle);
-    while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
-    while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
-    r.angle = (target.fromAngle || r.angle) + angleDiff * t;
+    // Smooth lerp
+    r.x += dx * 0.3;
+    r.y += dy * 0.3;
+    var ad = target.targetAngle - r.angle;
+    while (ad > Math.PI) ad -= Math.PI * 2;
+    while (ad < -Math.PI) ad += Math.PI * 2;
+    r.angle += ad * 0.3;
+    r.speed += (target.targetSpeed - r.speed) * 0.3;
   }
-
-  r.speed = target.targetSpeed || r.speed;
 }
 
 // ---- Multiplayer Reset ----
