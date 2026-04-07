@@ -15,11 +15,11 @@ canvas#c {
   position: fixed; top: 0; left: 0;
   width: 100vw; height: 100vh;
 }
-#ui { position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,0.7); padding: 12px; border-radius: 8px; font-size: 14px; min-width: 180px; display: none; z-index: 2; }
+#ui { position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,0.7); padding: 12px; border-radius: 8px; font-size: 14px; min-width: 180px; display: none !important; z-index: 2; }
 #ui h3 { margin-bottom: 8px; font-size: 16px; color: #ffd700; }
 .pos-entry { display: flex; align-items: center; gap: 6px; margin: 3px 0; }
 .color-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
-#lap-info { position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.7); padding: 12px; border-radius: 8px; font-size: 14px; display: none; z-index: 2; }
+#lap-info { position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.7); padding: 12px; border-radius: 8px; font-size: 14px; display: none !important; z-index: 2; }
 #countdown { position: absolute; font-size: 120px; font-weight: bold; color: #ffd700; text-shadow: 0 0 40px rgba(255,215,0,0.6); z-index: 5; display: none; }
 #finish-screen { position: absolute; display: none; flex-direction: column; align-items: center; gap: 16px; background: rgba(0,0,0,0.85); padding: 40px; border-radius: 16px; z-index: 10; }
 #finish-screen h2 { font-size: 36px; color: #ffd700; }
@@ -1863,29 +1863,91 @@ function updateUI() {
     return b.totalProgress - a.totalProgress;
   });
 
-  const posDiv = document.getElementById('positions');
-  posDiv.innerHTML = sorted.map((r, i) => {
-    const lapDisplay = Math.min(r.lap, TOTAL_LAPS);
-    const status = r.finished ? ' (FINISHED)' : '';
-    return `<div class="pos-entry">
-      <span style="color:#aaa;width:16px">${i + 1}.</span>
-      <span class="color-dot" style="background:${r.color}"></span>
-      <span style="color:${r.color}">${r.name}</span>
-      <span style="color:#666;margin-left:auto">L${lapDisplay}${status}</span>
-    </div>`;
-  }).join('');
+  drawHUD(sorted);
+}
 
-  const leader = sorted[0];
-  document.getElementById('lap-current').textContent = Math.min(leader ? leader.lap + 1 : 1, TOTAL_LAPS);
-  document.getElementById('lap-total').textContent = TOTAL_LAPS;
+function drawHUD(sorted) {
+  ctx.save();
 
-  if (player && track) {
-    const mph = Math.round(player.speed * 20);
-    const cl = track.centerline.length;
-    const pct = Math.max(0, Math.min(100, (player.totalProgress / (cl * TOTAL_LAPS)) * 100)).toFixed(1);
-    const lapInfo = document.getElementById('lap-info');
-    lapInfo.innerHTML = `Lap <span id="lap-current">${Math.min(leader ? leader.lap + 1 : 1, TOTAL_LAPS)}</span> / <span id="lap-total">${TOTAL_LAPS}</span><br><span style="color:#aaa;font-size:12px">Race: ${pct}%</span>`;
+  // ---- Positions list (top-left) ----
+  const px = 4;
+  var py = 4;
+  const lineH = 9;
+  const fontSize = 7;
+
+  // Background box
+  const boxW = 70;
+  const boxH = 10 + sorted.length * lineH;
+  ctx.fillStyle = 'rgba(0,0,0,0.65)';
+  ctx.fillRect(px - 2, py - 2, boxW, boxH);
+
+  // Header
+  ctx.font = 'bold ' + fontSize + 'px sans-serif';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  ctx.fillStyle = '#ffd700';
+  ctx.fillText('Positions', px + 1, py);
+  py += lineH + 1;
+
+  // Entries
+  ctx.font = fontSize + 'px sans-serif';
+  for (var i = 0; i < sorted.length; i++) {
+    var r = sorted[i];
+    var lapDisplay = Math.min(r.lap, TOTAL_LAPS);
+    var status = r.finished ? '*' : '';
+
+    // Rank number
+    ctx.fillStyle = '#aaa';
+    ctx.fillText((i + 1) + '.', px + 1, py);
+
+    // Color square
+    ctx.fillStyle = r.color;
+    ctx.fillRect(px + 12, py + 1, 5, 5);
+
+    // Name
+    ctx.fillStyle = r.color;
+    ctx.fillText(r.name, px + 19, py);
+
+    // Lap
+    ctx.fillStyle = '#666';
+    ctx.textAlign = 'right';
+    ctx.fillText('L' + lapDisplay + status, px + boxW - 4, py);
+    ctx.textAlign = 'left';
+
+    py += lineH;
   }
+
+  // ---- Lap info (top-right) ----
+  if (player && track) {
+    var leader = sorted[0];
+    var currentLap = Math.min(leader ? leader.lap + 1 : 1, TOTAL_LAPS);
+    var cl = track.centerline.length;
+    var pct = Math.max(0, Math.min(100, (player.totalProgress / (cl * TOTAL_LAPS)) * 100)).toFixed(1);
+
+    var rx = canvas.width - 4;
+    var ry = 4;
+
+    // Background box
+    var lapBoxW = 52;
+    var lapBoxH = 20;
+    ctx.fillStyle = 'rgba(0,0,0,0.65)';
+    ctx.fillRect(rx - lapBoxW, ry - 2, lapBoxW + 2, lapBoxH);
+
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'top';
+
+    // Lap line
+    ctx.font = 'bold ' + fontSize + 'px sans-serif';
+    ctx.fillStyle = '#fff';
+    ctx.fillText('LAP ' + currentLap + '/' + TOTAL_LAPS, rx, ry);
+
+    // Percentage
+    ctx.font = fontSize + 'px sans-serif';
+    ctx.fillStyle = '#aaa';
+    ctx.fillText('Race: ' + pct + '%', rx, ry + lineH);
+  }
+
+  ctx.restore();
 }
 
 // ---- Speedometer Gauge ----
@@ -1894,9 +1956,9 @@ function drawSpeedometer() {
   if (!player) return;
   const mph = Math.round(player.speed * 20);
   const maxMPH = 200;
-  const radius = 50;
+  const radius = 35;
   const cx = 15 + radius;
-  const cy = canvas.height - 35;
+  const cy = canvas.height - 50;
   const startAngle = Math.PI;
   const endAngle = Math.PI * 2;
 
