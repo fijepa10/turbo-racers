@@ -1281,7 +1281,7 @@ function updateRacer(r, dt, allRacers) {
   r.lastX = r.x;
   r.lastY = r.y;
 
-  if (r.stuckTimer > 5000) {
+  if (r.stuckTimer > 1000) {
     const ci = closestCenterlineIndex(r.x, r.y);
     const ahead = (ci + 5) % track.centerline.length;
     r.x = track.centerline[ahead].x;
