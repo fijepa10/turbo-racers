@@ -254,7 +254,7 @@ button:hover { transform: scale(1.05); }
   <button class="menu-btn secondary" onclick="showSettingsScreen()">SETTINGS</button>
   <p class="coming-soon-tooltip" id="coming-soon-msg">COMING SOON</p>
   <p style="color:#555;font-size:12px;margin-top:8px">Arrow keys or WASD to drive</p>
-  <p id="version-text" style="color:#333;font-size:10px;margin-top:12px">v1.7.0</p>
+  <p id="version-text" style="color:#333;font-size:10px;margin-top:12px">v1.8.0</p>
 </div>
 
 <!-- Single Player Setup -->
@@ -3011,6 +3011,9 @@ function mpHandleStateUpdate(remotePlayers) {
           target.targetY = rp.y;
           target.targetAngle = rp.angle;
           target.targetSpeed = rp.speed;
+          target.steering = (rp.input && rp.input.steering) || 0;
+          target.throttle = (rp.input && rp.input.throttle) || 0;
+          target.brake = (rp.input && rp.input.brake) || 0;
           target.newData = true;
         }
         // Update lap/progress/boost directly from server
@@ -3031,40 +3034,58 @@ function mpInterpolateRemote(r, dt) {
   if (!target) return;
 
   if (target.newData) {
-    // Server update - calculate correction needed
+    // Server update arrived - calculate correction needed
     target.errorX = target.targetX - r.x;
     target.errorY = target.targetY - r.y;
     var ad = target.targetAngle - r.angle;
     while (ad > Math.PI) ad -= Math.PI * 2;
     while (ad < -Math.PI) ad += Math.PI * 2;
     target.errorAngle = ad;
-    r.speed = target.targetSpeed;
+    target.speedError = target.targetSpeed - r.speed;
     // If way off, just snap
     var errDist = Math.sqrt(target.errorX * target.errorX + target.errorY * target.errorY);
-    if (errDist > 100) {
+    if (errDist > 200) {
       r.x = target.targetX;
       r.y = target.targetY;
       r.angle = target.targetAngle;
+      r.speed = target.targetSpeed;
       target.errorX = 0;
       target.errorY = 0;
       target.errorAngle = 0;
+      target.speedError = 0;
     }
     target.newData = false;
+  }
+
+  // Apply steering to angle (mirrors local physics: turnRate 0.045, speed-dependent)
+  var steer = target.steering || 0;
+  if (steer) {
+    var turnRate = 0.045;
+    r.steerAngle = steer * turnRate;
+    var effectiveMax = r.maxSpeed || 3;
+    r.angle += r.steerAngle * (0.6 + Math.min(1, r.speed / effectiveMax) * 0.4);
   }
 
   // Dead reckon forward
   r.x += Math.cos(r.angle) * r.speed;
   r.y += Math.sin(r.angle) * r.speed;
 
-  // Gradually apply correction (spread over ~3 frames)
-  if (target.errorX || target.errorY || target.errorAngle) {
-    var blend = 0.4;
+  // Gradually apply correction (spread over ~10 frames for smoothness)
+  var blend = 0.12;
+  if (target.errorX || target.errorY || target.errorAngle || target.speedError) {
     r.x += (target.errorX || 0) * blend;
     r.y += (target.errorY || 0) * blend;
     r.angle += (target.errorAngle || 0) * blend;
+    r.speed += (target.speedError || 0) * blend;
     target.errorX *= (1 - blend);
     target.errorY *= (1 - blend);
     target.errorAngle *= (1 - blend);
+    target.speedError *= (1 - blend);
+    // Stop correcting when error is negligible
+    if (Math.abs(target.errorX) < 0.01) target.errorX = 0;
+    if (Math.abs(target.errorY) < 0.01) target.errorY = 0;
+    if (Math.abs(target.errorAngle) < 0.001) target.errorAngle = 0;
+    if (Math.abs(target.speedError) < 0.001) target.speedError = 0;
   }
 }
 
